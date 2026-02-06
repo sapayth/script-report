@@ -14,8 +14,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Script_Report {
 
-	const GET_PARAM   = 'script_reports';
-	const NONCE_ACTION = 'script_report_view';
+	const GET_PARAM             = 'script_reports';
+	const NONCE_ACTION          = 'script_report_view';
+	const BACKTRACE_FRAME_LIMIT = 15;
+	const MAX_INDENT_DEPTH      = 5;
 
 	/**
 	 * Registration source per handle: script_handle => label, style_handle => label.
@@ -24,6 +26,13 @@ class Script_Report {
 	 */
 	private $script_sources = array();
 	private $style_sources  = array();
+
+	/**
+	 * Cache for get_file_size() by normalized src.
+	 *
+	 * @var array
+	 */
+	private $file_size_cache = array();
 
 	/**
 	 * Constructor.
@@ -104,6 +113,9 @@ class Script_Report {
 	 * @param bool   $in_footer In footer.
 	 */
 	public function record_script_registration( $handle, $src, $deps, $ver, $in_footer ) {
+		if ( ! $this->is_report_request() ) {
+			return;
+		}
 		$this->script_sources[ $handle ] = $this->get_registration_source_from_backtrace();
 	}
 
@@ -117,6 +129,9 @@ class Script_Report {
 	 * @param string $media  Media.
 	 */
 	public function record_style_registration( $handle, $src, $deps, $ver, $media ) {
+		if ( ! $this->is_report_request() ) {
+			return;
+		}
 		$this->style_sources[ $handle ] = $this->get_registration_source_from_backtrace();
 	}
 
@@ -126,7 +141,7 @@ class Script_Report {
 	 * @return string
 	 */
 	private function get_registration_source_from_backtrace() {
-		$trace      = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 15 );
+		$trace      = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, self::BACKTRACE_FRAME_LIMIT );
 		$wp_content = wp_normalize_path( WP_CONTENT_DIR );
 		$wp_includes = wp_normalize_path( ABSPATH . WPINC );
 
@@ -154,6 +169,19 @@ class Script_Report {
 	}
 
 	/**
+	 * Normalize a script/style src URL by stripping query string.
+	 *
+	 * @param string $src Source URL.
+	 * @return string
+	 */
+	private function normalize_src( $src ) {
+		if ( ! is_string( $src ) || $src === '' ) {
+			return '';
+		}
+		return preg_replace( '/\?.*$/', '', $src );
+	}
+
+	/**
 	 * Build map: normalized_src => [ handle1, handle2, ... ] for handles that share the same src.
 	 *
 	 * @param array $registered Registered items (handle => object with src).
@@ -165,7 +193,7 @@ class Script_Report {
 			if ( empty( $item->src ) ) {
 				continue;
 			}
-			$normalized = preg_replace( '/\?.*$/', '', $item->src );
+			$normalized = $this->normalize_src( $item->src );
 			if ( $normalized === '' ) {
 				continue;
 			}
@@ -200,7 +228,8 @@ class Script_Report {
 			ob_end_clean();
 		}
 
-		$view = isset( $_GET['view'] ) && $_GET['view'] === 'tree' ? 'tree' : 'list';
+		$view_raw = isset( $_GET['view'] ) ? sanitize_key( wp_unslash( $_GET['view'] ) ) : '';
+		$view     = $view_raw === 'tree' ? 'tree' : 'list';
 		$base_url = remove_query_arg( array( 'view' ) );
 		$list_url = add_query_arg( 'view', 'list', $base_url );
 		$tree_url = add_query_arg( 'view', 'tree', $base_url );
@@ -214,52 +243,42 @@ class Script_Report {
 		<head>
 			<meta charset="UTF-8">
 			<meta name="viewport" content="width=device-width, initial-scale=1">
-			<title>Script &amp; Style Dependencies</title>
+			<title><?php echo esc_html( __( 'Script & Style Report', 'script-report' ) ); ?></title>
 			<link rel="stylesheet" href="<?php echo esc_url( $report_css_url ); ?>?v=<?php echo esc_attr( SCRIPT_REPORT_VERSION ); ?>">
 		</head>
 		<body>
-			<h1>WordPress Script &amp; Style Dependencies Audit</h1>
+			<h1><?php echo esc_html( __( 'Script & Style Report', 'script-report' ) ); ?></h1>
 			<div class="stats">
-				<div class="stats-item"><strong>Time:</strong> <?php echo esc_html( current_time( 'Y-m-d H:i:s' ) ); ?></div>
+				<div class="stats-item"><strong><?php echo esc_html( __( 'Generated', 'script-report' ) ); ?></strong> <?php echo esc_html( current_time( 'Y-m-d H:i:s' ) ); ?></div>
 			</div>
 
 			<?php if ( $wp_scripts ) : ?>
+				<?php $scripts_data = $this->get_deps_report_data( $wp_scripts ); ?>
 				<div class="section">
-					<h2>JavaScript Dependencies</h2>
+					<h2><?php esc_html_e( 'JavaScript', 'script-report' ); ?></h2>
 					<?php $this->render_section_toolbar( $view, $list_url, $tree_url ); ?>
 					<?php
-					$needed_scripts = array();
-					foreach ( $wp_scripts->queue as $handle ) {
-						$this->collect_needed( $handle, $wp_scripts->registered, 'deps', $needed_scripts );
-					}
-					$total_size = $this->sum_size( $wp_scripts->registered, array_keys( $needed_scripts ) );
-					$print_order_scripts = $this->get_print_order( $wp_scripts );
-					$this->render_script_stats( $wp_scripts, count( $needed_scripts ), $total_size );
+					$this->render_deps_stats( $wp_scripts, count( $scripts_data['needed'] ), $scripts_data['total_size'], __( 'Scripts', 'script-report' ) );
 					if ( $view === 'tree' ) {
 						$this->render_script_tree( $wp_scripts );
 					} else {
-						$this->render_script_list( $wp_scripts, $print_order_scripts );
+						$this->render_deps_list( $wp_scripts, $scripts_data['print_order'], $this->script_sources, true, $scripts_data );
 					}
 					?>
 				</div>
 			<?php endif; ?>
 
 			<?php if ( $wp_styles ) : ?>
+				<?php $styles_data = $this->get_deps_report_data( $wp_styles ); ?>
 				<div class="section">
-					<h2>CSS Dependencies</h2>
+					<h2><?php esc_html_e( 'CSS', 'script-report' ); ?></h2>
 					<?php $this->render_section_toolbar( $view, $list_url, $tree_url ); ?>
 					<?php
-					$needed_styles = array();
-					foreach ( $wp_styles->queue as $handle ) {
-						$this->collect_needed( $handle, $wp_styles->registered, 'deps', $needed_styles );
-					}
-					$total_size = $this->sum_size( $wp_styles->registered, array_keys( $needed_styles ) );
-					$print_order_styles = $this->get_print_order( $wp_styles );
-					$this->render_style_stats( $wp_styles, count( $needed_styles ), $total_size );
+					$this->render_deps_stats( $wp_styles, count( $styles_data['needed'] ), $styles_data['total_size'], __( 'Styles', 'script-report' ) );
 					if ( $view === 'tree' ) {
 						$this->render_style_tree( $wp_styles );
 					} else {
-						$this->render_style_list( $wp_styles, $print_order_styles );
+						$this->render_deps_list( $wp_styles, $styles_data['print_order'], $this->style_sources, false, $styles_data );
 					}
 					?>
 				</div>
@@ -267,7 +286,7 @@ class Script_Report {
 
 			<?php if ( $wp_script_modules && method_exists( $wp_script_modules, 'get_enqueued' ) ) : ?>
 				<div class="section">
-					<h2>Script Module Dependencies</h2>
+					<h2><?php esc_html_e( 'Modules', 'script-report' ); ?></h2>
 					<?php $this->render_script_modules( $wp_script_modules ); ?>
 				</div>
 			<?php endif; ?>
@@ -304,9 +323,9 @@ class Script_Report {
 	 */
 	private function render_section_toolbar( $current_view, $list_url, $tree_url ) {
 		echo '<div class="report-toolbar">';
-		echo '<a href="' . esc_url( $list_url ) . '" class="' . ( $current_view === 'list' ? 'active' : '' ) . '">List</a>';
-		echo '<a href="' . esc_url( $tree_url ) . '" class="' . ( $current_view === 'tree' ? 'active' : '' ) . '">Tree</a>';
-		echo '<input type="text" class="filter" placeholder="Filter by handle or src..." aria-label="Filter">';
+		echo '<a href="' . esc_url( $list_url ) . '" class="' . ( $current_view === 'list' ? 'active' : '' ) . '">' . esc_html__( 'List', 'script-report' ) . '</a>';
+		echo '<a href="' . esc_url( $tree_url ) . '" class="' . ( $current_view === 'tree' ? 'active' : '' ) . '">' . esc_html__( 'Tree', 'script-report' ) . '</a>';
+		echo '<input type="text" class="filter" placeholder="' . esc_attr__( 'Search…', 'script-report' ) . '" aria-label="' . esc_attr__( 'Search', 'script-report' ) . '">';
 		echo '</div>';
 	}
 
@@ -388,6 +407,28 @@ class Script_Report {
 	}
 
 	/**
+	 * Build report data for scripts or styles (needed set, print order, sizes, dependents, duplicate src).
+	 * Extracted so logic can be unit tested without rendering.
+	 *
+	 * @param WP_Scripts|WP_Styles $wp_deps Dependency object.
+	 * @return array{ needed: array, print_order: array, total_size: int, dependents: array, duplicate_src: array }
+	 */
+	public function get_deps_report_data( $wp_deps ) {
+		$needed = array();
+		foreach ( $wp_deps->queue as $handle ) {
+			$this->collect_needed( $handle, $wp_deps->registered, 'deps', $needed );
+		}
+		$needed_handles = array_keys( $needed );
+		return array(
+			'needed'        => $needed,
+			'print_order'   => $this->get_print_order( $wp_deps ),
+			'total_size'    => $this->sum_size( $wp_deps->registered, $needed_handles ),
+			'dependents'    => $this->build_dependents( $wp_deps->registered, 'deps' ),
+			'duplicate_src' => $this->build_duplicate_src_map( $wp_deps->registered ),
+		);
+	}
+
+	/**
 	 * Build dependents map: dep_handle => [ handles that list it as dep ].
 	 *
 	 * @param array  $registered Registered items (handle => object with deps).
@@ -434,280 +475,222 @@ class Script_Report {
 		return array_unique( $parents );
 	}
 
-	private function render_script_stats( $wp_scripts, $needed_count, $total_size ) {
-		$registered = count( $wp_scripts->registered );
-		$enqueued   = count( $wp_scripts->queue );
+	/**
+	 * Render stats block for scripts or styles.
+	 *
+	 * @param WP_Scripts|WP_Styles $wp_deps     Dependency object.
+	 * @param int                  $needed_count Number of needed items (enqueued + deps).
+	 * @param int                  $total_size   Total file size in bytes.
+	 * @param string               $item_name    Label for the asset type (e.g. 'Scripts', 'Styles').
+	 */
+	private function render_deps_stats( $wp_deps, $needed_count, $total_size, $item_name ) {
+		$registered   = count( $wp_deps->registered );
+		$enqueued     = count( $wp_deps->queue );
+		$meta_reg     = __( 'registered on this site', 'script-report' );
+		$meta_enq     = __( 'requested by theme or plugins', 'script-report' );
+		$meta_loaded  = __( 'actually loaded (with dependencies)', 'script-report' );
+		$label_loaded = sprintf( __( '%s loaded', 'script-report' ), $item_name );
 		echo '<div class="stats">';
-		echo '<div class="stats-item"><strong>Total Registered:</strong> ' . (int) $registered . ' <span class="meta">(all scripts WordPress knows about)</span></div>';
-		echo '<div class="stats-item"><strong>Directly Enqueued:</strong> ' . (int) $enqueued . ' <span class="meta">(explicitly requested by plugins/themes)</span></div>';
-		echo '<div class="stats-item"><strong>Total Scripts Needed:</strong> ' . (int) $needed_count . ' <span class="meta">(enqueued + all their dependencies)</span></div>';
+		echo '<div class="stats-item"><strong>' . esc_html__( 'Registered', 'script-report' ) . '</strong> ' . (int) $registered . ' <span class="meta">' . esc_html( $meta_reg ) . '</span></div>';
+		echo '<div class="stats-item"><strong>' . esc_html__( 'Enqueued', 'script-report' ) . '</strong> ' . (int) $enqueued . ' <span class="meta">' . esc_html( $meta_enq ) . '</span></div>';
+		echo '<div class="stats-item"><strong>' . esc_html( $label_loaded ) . '</strong> ' . (int) $needed_count . ' <span class="meta">' . esc_html( $meta_loaded ) . '</span></div>';
 		if ( $total_size > 0 ) {
-			echo '<div class="stats-item"><strong>Total Size:</strong> ' . esc_html( $this->format_bytes( $total_size ) ) . ' <span class="meta">(uncompressed file size)</span></div>';
+			echo '<div class="stats-item"><strong>' . esc_html__( 'Size', 'script-report' ) . '</strong> ' . esc_html( $this->format_bytes( $total_size ) ) . '</div>';
 		}
 		echo '</div>';
 	}
 
-	private function render_style_stats( $wp_styles, $needed_count, $total_size ) {
-		$registered = count( $wp_styles->registered );
-		$enqueued   = count( $wp_styles->queue );
-		echo '<div class="stats">';
-		echo '<div class="stats-item"><strong>Total Registered:</strong> ' . (int) $registered . ' <span class="meta">(all styles WordPress knows about)</span></div>';
-		echo '<div class="stats-item"><strong>Directly Enqueued:</strong> ' . (int) $enqueued . ' <span class="meta">(explicitly requested by plugins/themes)</span></div>';
-		echo '<div class="stats-item"><strong>Total Styles Needed:</strong> ' . (int) $needed_count . ' <span class="meta">(enqueued + all their dependencies)</span></div>';
-		if ( $total_size > 0 ) {
-			echo '<div class="stats-item"><strong>Total Size:</strong> ' . esc_html( $this->format_bytes( $total_size ) ) . ' <span class="meta">(uncompressed file size)</span></div>';
+	/**
+	 * Render tree view for scripts or styles.
+	 *
+	 * @param WP_Scripts|WP_Styles $wp_deps       Dependency object.
+	 * @param array                $sources      Handle => registration source label.
+	 * @param bool                 $is_script   True to show script-specific badges.
+	 * @param string               $title       Section title.
+	 * @param string               $empty_message Message when queue is empty.
+	 */
+	private function render_deps_tree( $wp_deps, $sources, $is_script, $title, $empty_message ) {
+		echo '<h3>' . esc_html( $title ) . '</h3>';
+		echo '<div class="tree-view">';
+		if ( empty( $wp_deps->queue ) ) {
+			echo '<p>' . esc_html( $empty_message ) . '</p>';
+		} else {
+			foreach ( $wp_deps->queue as $handle ) {
+				$this->render_deps_node( $handle, $wp_deps, 0, array(), $sources, $is_script );
+			}
 		}
 		echo '</div>';
+	}
+
+	/**
+	 * Render a single node in the dependency tree.
+	 *
+	 * @param string               $handle    Handle.
+	 * @param WP_Scripts|WP_Styles $wp_deps   Dependency object.
+	 * @param int                  $depth     Depth for indentation.
+	 * @param array                $visited   Visited handles (passed by reference).
+	 * @param array                $sources   Handle => registration source label.
+	 * @param bool                 $is_script True to show script-specific badges.
+	 */
+	private function render_deps_node( $handle, $wp_deps, $depth, $visited, $sources, $is_script ) {
+		$indent_class = 'indent-' . min( $depth, self::MAX_INDENT_DEPTH );
+
+		if ( in_array( $handle, $visited, true ) ) {
+			echo '<div class="node ' . esc_attr( $indent_class ) . '"><span class="handle">' . esc_html( $handle ) . '</span><span class="badge badge-circular">' . esc_html__( 'CIRCULAR', 'script-report' ) . '</span></div>';
+			return;
+		}
+
+		if ( ! isset( $wp_deps->registered[ $handle ] ) ) {
+			echo '<div class="node ' . esc_attr( $indent_class ) . '"><span class="handle">' . esc_html( $handle ) . '</span><span class="badge badge-missing">' . esc_html__( 'MISSING', 'script-report' ) . '</span></div>';
+			return;
+		}
+
+		$item     = $wp_deps->registered[ $handle ];
+		$visited[] = $handle;
+
+		$label_registered = __( 'Added by', 'script-report' );
+
+		echo '<div class="node ' . esc_attr( $indent_class ) . '">';
+		echo '<span class="handle">' . esc_html( $handle ) . '</span>';
+		if ( in_array( $handle, $wp_deps->queue, true ) ) {
+			echo '<span class="badge badge-enqueued">' . esc_html__( 'ENQUEUED', 'script-report' ) . '</span>';
+		}
+		if ( $is_script && ! empty( $item->extra['group'] ) ) {
+			echo '<span class="badge badge-footer">' . esc_html__( 'FOOTER', 'script-report' ) . '</span>';
+		}
+		if ( $is_script ) {
+			$this->render_inline_badge( $item );
+		}
+		if ( ! empty( $item->src ) ) {
+			echo '<div class="src">↳ ' . esc_html( $item->src );
+			if ( ! empty( $item->ver ) ) {
+				echo '<span class="meta"> (v' . esc_html( $item->ver ) . ')</span>';
+			}
+			echo '</div>';
+		}
+		if ( isset( $sources[ $handle ] ) ) {
+			echo '<div class="src meta">' . esc_html( $label_registered ) . ': ' . esc_html( $sources[ $handle ] ) . '</div>';
+		}
+		echo '</div>';
+
+		if ( ! empty( $item->deps ) ) {
+			foreach ( $item->deps as $dep ) {
+				$this->render_deps_node( $dep, $wp_deps, $depth + 1, $visited, $sources, $is_script );
+			}
+		}
 	}
 
 	private function render_script_tree( $wp_scripts ) {
-		echo '<h3>Enqueued Scripts (with dependencies)</h3>';
-		echo '<div class="tree-view">';
-		if ( empty( $wp_scripts->queue ) ) {
-			echo '<p>No scripts enqueued yet.</p>';
-		} else {
-			foreach ( $wp_scripts->queue as $handle ) {
-				$this->render_script_node( $handle, $wp_scripts, 0, array() );
-			}
-		}
-		echo '</div>';
-	}
-
-	private function render_script_node( $handle, $wp_scripts, $depth, $visited ) {
-		$indent_class = 'indent-' . min( $depth, 5 );
-
-		if ( in_array( $handle, $visited, true ) ) {
-			echo '<div class="node ' . esc_attr( $indent_class ) . '"><span class="handle">' . esc_html( $handle ) . '</span><span class="badge badge-circular">CIRCULAR</span></div>';
-			return;
-		}
-
-		if ( ! isset( $wp_scripts->registered[ $handle ] ) ) {
-			echo '<div class="node ' . esc_attr( $indent_class ) . '"><span class="handle">' . esc_html( $handle ) . '</span><span class="badge badge-missing">MISSING</span></div>';
-			return;
-		}
-
-		$script   = $wp_scripts->registered[ $handle ];
-		$visited[] = $handle;
-
-		echo '<div class="node ' . esc_attr( $indent_class ) . '">';
-		echo '<span class="handle">' . esc_html( $handle ) . '</span>';
-		if ( in_array( $handle, $wp_scripts->queue, true ) ) {
-			echo '<span class="badge badge-enqueued">ENQUEUED</span>';
-		}
-		if ( ! empty( $script->extra['group'] ) ) {
-			echo '<span class="badge badge-footer">FOOTER</span>';
-		}
-		$this->render_inline_badge( $script );
-		if ( ! empty( $script->src ) ) {
-			echo '<div class="src">↳ ' . esc_html( $script->src );
-			if ( ! empty( $script->ver ) ) {
-				echo '<span class="meta"> (v' . esc_html( $script->ver ) . ')</span>';
-			}
-			echo '</div>';
-		}
-		if ( isset( $this->script_sources[ $handle ] ) ) {
-			echo '<div class="src meta">Registered by: ' . esc_html( $this->script_sources[ $handle ] ) . '</div>';
-		}
-		echo '</div>';
-
-		if ( ! empty( $script->deps ) ) {
-			foreach ( $script->deps as $dep ) {
-				$this->render_script_node( $dep, $wp_scripts, $depth + 1, $visited );
-			}
-		}
+		$this->render_deps_tree(
+			$wp_scripts,
+			$this->script_sources,
+			true,
+			__( 'Scripts loaded on this page', 'script-report' ),
+			__( 'No scripts loaded.', 'script-report' )
+		);
 	}
 
 	private function render_style_tree( $wp_styles ) {
-		echo '<h3>Enqueued Styles (with dependencies)</h3>';
-		echo '<div class="tree-view">';
-		if ( empty( $wp_styles->queue ) ) {
-			echo '<p>No styles enqueued yet.</p>';
-		} else {
-			foreach ( $wp_styles->queue as $handle ) {
-				$this->render_style_node( $handle, $wp_styles, 0, array() );
-			}
-		}
-		echo '</div>';
+		$this->render_deps_tree(
+			$wp_styles,
+			$this->style_sources,
+			false,
+			__( 'Styles loaded on this page', 'script-report' ),
+			__( 'No styles loaded.', 'script-report' )
+		);
 	}
 
-	private function render_style_node( $handle, $wp_styles, $depth, $visited ) {
-		$indent_class = 'indent-' . min( $depth, 5 );
+	/**
+	 * Render list view for scripts or styles.
+	 *
+	 * @param WP_Scripts|WP_Styles $wp_deps     Dependency object.
+	 * @param array                $print_order Ordered handles.
+	 * @param array                $sources     Handle => registration source label.
+	 * @param bool                 $is_script   True to show script-specific badges (footer, inline).
+	 * @param array                $report_data Precomputed data from get_deps_report_data().
+	 */
+	private function render_deps_list( $wp_deps, $print_order, $sources, $is_script, $report_data ) {
+		$dependents    = $report_data['dependents'];
+		$duplicate_src = $report_data['duplicate_src'];
+		$needed        = $report_data['needed'];
+		$all_handles   = array_keys( $needed );
+		sort( $all_handles );
+		$order_map = array_flip( $print_order );
 
-		if ( in_array( $handle, $visited, true ) ) {
-			echo '<div class="node ' . esc_attr( $indent_class ) . '"><span class="handle">' . esc_html( $handle ) . '</span><span class="badge badge-circular">CIRCULAR</span></div>';
-			return;
-		}
+		$label_registered   = __( 'Added by', 'script-report' );
+		$label_same_src     = __( 'Same file as', 'script-report' );
+		$label_enqueued_by  = __( 'Loaded because of', 'script-report' );
+		$label_required_by  = __( 'Used by', 'script-report' );
 
-		if ( ! isset( $wp_styles->registered[ $handle ] ) ) {
-			echo '<div class="node ' . esc_attr( $indent_class ) . '"><span class="handle">' . esc_html( $handle ) . '</span><span class="badge badge-missing">MISSING</span></div>';
-			return;
-		}
+		echo '<div class="list-view">';
+		foreach ( $all_handles as $handle ) {
+			if ( ! isset( $wp_deps->registered[ $handle ] ) ) {
+				continue;
+			}
+			$item        = $wp_deps->registered[ $handle ];
+			$is_enqueued = in_array( $handle, $wp_deps->queue, true );
+			$order_pos   = isset( $order_map[ $handle ] ) ? $order_map[ $handle ] + 1 : null;
 
-		$style    = $wp_styles->registered[ $handle ];
-		$visited[] = $handle;
-
-		echo '<div class="node ' . esc_attr( $indent_class ) . '">';
-		echo '<span class="handle">' . esc_html( $handle ) . '</span>';
-		if ( in_array( $handle, $wp_styles->queue, true ) ) {
-			echo '<span class="badge badge-enqueued">ENQUEUED</span>';
-		}
-		if ( ! empty( $style->src ) ) {
-			echo '<div class="src">↳ ' . esc_html( $style->src );
-			if ( ! empty( $style->ver ) ) {
-				echo '<span class="meta"> (v' . esc_html( $style->ver ) . ')</span>';
+			echo '<div class="list-item">';
+			echo '<div class="list-item-main">';
+			echo '<span class="handle">' . esc_html( $handle ) . '</span>';
+			if ( $order_pos !== null ) {
+				echo '<span class="order-badge">#' . (int) $order_pos . '</span>';
+			}
+			$file_size = $this->get_file_size( $item->src );
+			if ( $file_size !== null ) {
+				echo '<span class="size-badge">' . esc_html( $this->format_bytes( $file_size ) ) . '</span>';
+			}
+			if ( $is_enqueued ) {
+				echo '<span class="badge badge-enqueued">' . esc_html__( 'ENQUEUED', 'script-report' ) . '</span>';
+			}
+			if ( $is_script && ! empty( $item->extra['group'] ) ) {
+				echo '<span class="badge badge-footer">' . esc_html__( 'FOOTER', 'script-report' ) . '</span>';
+			}
+			if ( $is_script ) {
+				$this->render_inline_badge( $item );
+			}
+			if ( isset( $duplicate_src[ $this->normalize_src( $item->src ) ] ) ) {
+				echo '<span class="badge badge-duplicate">' . esc_html__( 'DUPLICATE SRC', 'script-report' ) . '</span>';
 			}
 			echo '</div>';
-		}
-		if ( isset( $this->style_sources[ $handle ] ) ) {
-			echo '<div class="src meta">Registered by: ' . esc_html( $this->style_sources[ $handle ] ) . '</div>';
+			echo '<div class="list-item-meta">';
+			if ( isset( $sources[ $handle ] ) ) {
+				echo '<div class="meta-item"><span class="meta-label">' . esc_html( $label_registered ) . ':</span> <span class="script-list">' . esc_html( $sources[ $handle ] ) . '</span></div>';
+			}
+			if ( ! empty( $item->src ) ) {
+				$norm = $this->normalize_src( $item->src );
+				if ( isset( $duplicate_src[ $norm ] ) ) {
+					$others = array_diff( $duplicate_src[ $norm ], array( $handle ) );
+					if ( ! empty( $others ) ) {
+						echo '<div class="meta-item"><span class="meta-label">' . esc_html( $label_same_src ) . ':</span> <span class="script-list">' . esc_html( implode( ', ', $others ) ) . '</span></div>';
+					}
+				}
+			}
+			if ( ! $is_enqueued ) {
+				$visited     = array();
+				$enqueued_by = $this->find_enqueued_parents( $handle, $wp_deps->queue, $dependents, $visited );
+				if ( ! empty( $enqueued_by ) ) {
+					echo '<div class="meta-item"><span class="meta-label">' . esc_html( $label_enqueued_by ) . ':</span> <span class="script-list">' . esc_html( implode( ', ', $enqueued_by ) ) . '</span></div>';
+				}
+			}
+			if ( isset( $dependents[ $handle ] ) ) {
+				$needed_deps = array_intersect( $dependents[ $handle ], $all_handles );
+				if ( ! empty( $needed_deps ) ) {
+					echo '<div class="meta-item"><span class="meta-label">' . esc_html( $label_required_by ) . ':</span> <span class="script-list">' . esc_html( implode( ', ', $needed_deps ) ) . '</span></div>';
+				}
+			}
+			echo '</div></div>';
 		}
 		echo '</div>';
-
-		if ( ! empty( $style->deps ) ) {
-			foreach ( $style->deps as $dep ) {
-				$this->render_style_node( $dep, $wp_styles, $depth + 1, $visited );
-			}
-		}
 	}
 
 	private function render_script_list( $wp_scripts, $print_order ) {
-		$dependents   = $this->build_dependents( $wp_scripts->registered, 'deps' );
-		$duplicate_src = $this->build_duplicate_src_map( $wp_scripts->registered );
-		$needed       = array();
-		foreach ( $wp_scripts->queue as $handle ) {
-			$this->collect_needed( $handle, $wp_scripts->registered, 'deps', $needed );
-		}
-		$all_handles = array_keys( $needed );
-		sort( $all_handles );
-		$order_map = array_flip( $print_order );
-
-		echo '<div class="list-view">';
-		foreach ( $all_handles as $handle ) {
-			if ( ! isset( $wp_scripts->registered[ $handle ] ) ) {
-				continue;
-			}
-			$script      = $wp_scripts->registered[ $handle ];
-			$is_enqueued = in_array( $handle, $wp_scripts->queue, true );
-			$order_pos   = isset( $order_map[ $handle ] ) ? $order_map[ $handle ] + 1 : null;
-
-			echo '<div class="list-item">';
-			echo '<div class="list-item-main">';
-			echo '<span class="handle">' . esc_html( $handle ) . '</span>';
-			if ( $order_pos !== null ) {
-				echo '<span class="order-badge">#' . (int) $order_pos . '</span>';
-			}
-			$file_size = $this->get_file_size( $script->src );
-			if ( $file_size !== null ) {
-				echo '<span class="size-badge">' . esc_html( $this->format_bytes( $file_size ) ) . '</span>';
-			}
-			if ( $is_enqueued ) {
-				echo '<span class="badge badge-enqueued">ENQUEUED</span>';
-			}
-			if ( ! empty( $script->extra['group'] ) ) {
-				echo '<span class="badge badge-footer">FOOTER</span>';
-			}
-			$this->render_inline_badge( $script );
-			if ( isset( $duplicate_src[ preg_replace( '/\?.*$/', '', $script->src ) ] ) ) {
-				echo '<span class="badge badge-duplicate">DUPLICATE SRC</span>';
-			}
-			echo '</div>';
-			echo '<div class="list-item-meta">';
-			if ( isset( $this->script_sources[ $handle ] ) ) {
-				echo '<div class="meta-item"><span class="meta-label">Registered by:</span> <span class="script-list">' . esc_html( $this->script_sources[ $handle ] ) . '</span></div>';
-			}
-			if ( ! empty( $script->src ) ) {
-				$norm = preg_replace( '/\?.*$/', '', $script->src );
-				if ( isset( $duplicate_src[ $norm ] ) ) {
-					$others = array_diff( $duplicate_src[ $norm ], array( $handle ) );
-					if ( ! empty( $others ) ) {
-						echo '<div class="meta-item"><span class="meta-label">Same src as:</span> <span class="script-list">' . esc_html( implode( ', ', $others ) ) . '</span></div>';
-					}
-				}
-			}
-			if ( ! $is_enqueued ) {
-				$visited = array();
-				$enqueued_by = $this->find_enqueued_parents( $handle, $wp_scripts->queue, $dependents, $visited );
-				if ( ! empty( $enqueued_by ) ) {
-					echo '<div class="meta-item"><span class="meta-label">Enqueued by:</span> <span class="script-list">' . esc_html( implode( ', ', $enqueued_by ) ) . '</span></div>';
-				}
-			}
-			if ( isset( $dependents[ $handle ] ) ) {
-				$needed_deps = array_intersect( $dependents[ $handle ], $all_handles );
-				if ( ! empty( $needed_deps ) ) {
-					echo '<div class="meta-item"><span class="meta-label">Required by:</span> <span class="script-list">' . esc_html( implode( ', ', $needed_deps ) ) . '</span></div>';
-				}
-			}
-			echo '</div></div>';
-		}
-		echo '</div>';
+		$this->render_deps_list( $wp_scripts, $print_order, $this->script_sources, true, $this->get_deps_report_data( $wp_scripts ) );
 	}
 
 	private function render_style_list( $wp_styles, $print_order ) {
-		$dependents    = $this->build_dependents( $wp_styles->registered, 'deps' );
-		$duplicate_src = $this->build_duplicate_src_map( $wp_styles->registered );
-		$needed        = array();
-		foreach ( $wp_styles->queue as $handle ) {
-			$this->collect_needed( $handle, $wp_styles->registered, 'deps', $needed );
-		}
-		$all_handles = array_keys( $needed );
-		sort( $all_handles );
-		$order_map = array_flip( $print_order );
-
-		echo '<div class="list-view">';
-		foreach ( $all_handles as $handle ) {
-			if ( ! isset( $wp_styles->registered[ $handle ] ) ) {
-				continue;
-			}
-			$style       = $wp_styles->registered[ $handle ];
-			$is_enqueued = in_array( $handle, $wp_styles->queue, true );
-			$order_pos   = isset( $order_map[ $handle ] ) ? $order_map[ $handle ] + 1 : null;
-
-			echo '<div class="list-item">';
-			echo '<div class="list-item-main">';
-			echo '<span class="handle">' . esc_html( $handle ) . '</span>';
-			if ( $order_pos !== null ) {
-				echo '<span class="order-badge">#' . (int) $order_pos . '</span>';
-			}
-			$file_size = $this->get_file_size( $style->src );
-			if ( $file_size !== null ) {
-				echo '<span class="size-badge">' . esc_html( $this->format_bytes( $file_size ) ) . '</span>';
-			}
-			if ( $is_enqueued ) {
-				echo '<span class="badge badge-enqueued">ENQUEUED</span>';
-			}
-			if ( isset( $duplicate_src[ preg_replace( '/\?.*$/', '', $style->src ) ] ) ) {
-				echo '<span class="badge badge-duplicate">DUPLICATE SRC</span>';
-			}
-			echo '</div>';
-			echo '<div class="list-item-meta">';
-			if ( isset( $this->style_sources[ $handle ] ) ) {
-				echo '<div class="meta-item"><span class="meta-label">Registered by:</span> <span class="script-list">' . esc_html( $this->style_sources[ $handle ] ) . '</span></div>';
-			}
-			if ( ! empty( $style->src ) ) {
-				$norm = preg_replace( '/\?.*$/', '', $style->src );
-				if ( isset( $duplicate_src[ $norm ] ) ) {
-					$others = array_diff( $duplicate_src[ $norm ], array( $handle ) );
-					if ( ! empty( $others ) ) {
-						echo '<div class="meta-item"><span class="meta-label">Same src as:</span> <span class="script-list">' . esc_html( implode( ', ', $others ) ) . '</span></div>';
-					}
-				}
-			}
-			if ( ! $is_enqueued ) {
-				$visited = array();
-				$enqueued_by = $this->find_enqueued_parents( $handle, $wp_styles->queue, $dependents, $visited );
-				if ( ! empty( $enqueued_by ) ) {
-					echo '<div class="meta-item"><span class="meta-label">Enqueued by:</span> <span class="script-list">' . esc_html( implode( ', ', $enqueued_by ) ) . '</span></div>';
-				}
-			}
-			if ( isset( $dependents[ $handle ] ) ) {
-				$needed_deps = array_intersect( $dependents[ $handle ], $all_handles );
-				if ( ! empty( $needed_deps ) ) {
-					echo '<div class="meta-item"><span class="meta-label">Required by:</span> <span class="script-list">' . esc_html( implode( ', ', $needed_deps ) ) . '</span></div>';
-				}
-			}
-			echo '</div></div>';
-		}
-		echo '</div>';
+		$this->render_deps_list( $wp_styles, $print_order, $this->style_sources, false, $this->get_deps_report_data( $wp_styles ) );
 	}
 
 	/**
@@ -720,7 +703,7 @@ class Script_Report {
 			return;
 		}
 		$len = strlen( $script->extra['data'] );
-		echo '<span class="badge badge-inline">INLINE ' . esc_html( $this->format_bytes( $len ) ) . '</span>';
+		echo '<span class="badge badge-inline">' . esc_html__( 'INLINE', 'script-report' ) . ' ' . esc_html( $this->format_bytes( $len ) ) . '</span>';
 	}
 
 	private function render_script_modules( $wp_script_modules ) {
@@ -742,18 +725,18 @@ class Script_Report {
 				}
 			}
 		} catch ( Exception $e ) {
-			echo '<p>Unable to retrieve script module information.</p>';
+			echo '<p>' . esc_html__( 'Could not load module data.', 'script-report' ) . '</p>';
 			return;
 		}
 
 		echo '<div class="stats">';
-		echo '<div class="stats-item"><strong>Total Registered:</strong> ' . count( $registered ) . ' <span class="meta">(all script modules WordPress knows about)</span></div>';
-		echo '<div class="stats-item"><strong>Enqueued:</strong> ' . count( $enqueued ) . ' <span class="meta">(modules marked for loading)</span></div>';
+		echo '<div class="stats-item"><strong>' . esc_html__( 'Registered', 'script-report' ) . '</strong> ' . count( $registered ) . ' <span class="meta">' . esc_html__( 'modules on this site', 'script-report' ) . '</span></div>';
+		echo '<div class="stats-item"><strong>' . esc_html__( 'Enqueued', 'script-report' ) . '</strong> ' . count( $enqueued ) . ' <span class="meta">' . esc_html__( 'loaded on this page', 'script-report' ) . '</span></div>';
 		echo '</div>';
 		echo '<div class="list-view">';
 
 		if ( empty( $registered ) ) {
-			echo '<p>No script modules registered.</p>';
+			echo '<p>' . esc_html__( 'No modules registered.', 'script-report' ) . '</p>';
 			echo '</div>';
 			return;
 		}
@@ -786,11 +769,11 @@ class Script_Report {
 			if ( $is_enqueued ) {
 				echo '<span class="badge badge-enqueued">ENQUEUED</span>';
 			}
-			echo '<span class="badge badge-module">MODULE</span>';
+			echo '<span class="badge badge-module">' . esc_html__( 'MODULE', 'script-report' ) . '</span>';
 			echo '</div>';
 			echo '<div class="list-item-meta">';
 			if ( ! empty( $deps ) ) {
-				echo '<div class="meta-item"><span class="meta-label">Depends on:</span> <span class="script-list">' . esc_html( implode( ', ', $deps ) ) . '</span></div>';
+				echo '<div class="meta-item"><span class="meta-label">' . esc_html__( 'Depends on', 'script-report' ) . ':</span> <span class="script-list">' . esc_html( implode( ', ', $deps ) ) . '</span></div>';
 			}
 			echo '</div></div>';
 		}
@@ -806,6 +789,11 @@ class Script_Report {
 	private function get_file_size( $src ) {
 		if ( empty( $src ) ) {
 			return null;
+		}
+
+		$normalized_src = $this->normalize_src( $src );
+		if ( isset( $this->file_size_cache[ $normalized_src ] ) ) {
+			return $this->file_size_cache[ $normalized_src ];
 		}
 
 		$file_path = null;
@@ -831,13 +819,16 @@ class Script_Report {
 		}
 
 		if ( $file_path ) {
-			$file_path = preg_replace( '/\?.*$/', '', $file_path );
+			$file_path = $this->normalize_src( $file_path );
 		}
 
 		if ( $file_path && file_exists( $file_path ) ) {
-			return (int) filesize( $file_path );
+			$size = (int) filesize( $file_path );
+			$this->file_size_cache[ $normalized_src ] = $size;
+			return $size;
 		}
 
+		$this->file_size_cache[ $normalized_src ] = null;
 		return null;
 	}
 
