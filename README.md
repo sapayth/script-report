@@ -9,7 +9,11 @@ A WordPress plugin that audits and visualizes JS/CSS script and style dependenci
 
 ## Installation
 
-1. Upload the `script-report` folder to `wp-content/plugins/`.
+1. Clone the repo into `wp-content/plugins/` so the plugin lives at `wp-content/plugins/script-report/`:
+   ```bash
+   cd wp-content/plugins
+   git clone https://github.com/YOUR_USERNAME/script-report.git script-report
+   ```
 2. Activate the plugin in **Plugins** in the admin.
 
 ## Usage
@@ -47,8 +51,8 @@ A WordPress plugin that audits and visualizes JS/CSS script and style dependenci
 
 ## Security
 
-- Report is shown only if the user can `manage_options` **or** `SCRIPT_REPORT_DEBUG` is defined and true.
-- No nonce is required for the GET trigger; access is controlled by capability/constant.
+- Report is shown only if the user can `manage_options`, **or** `SCRIPT_REPORT_DEBUG` is defined and true, **or** the URL includes a valid `_wpnonce` for the `script_report_view` action (e.g. the “Script Report” admin bar link).
+- Nonce validation is used for nonced links; direct `?script_reports=true` still requires capability or `SCRIPT_REPORT_DEBUG`.
 
 ## License
 
