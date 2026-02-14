@@ -8,7 +8,7 @@ Tested up to: 6.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Audit and visualize JS/CSS script dependencies. Add ?script_reports=true to any URL to see what is enqueued and in what order.
+Audit and visualize JS/CSS script dependencies. Add ?script_reports=true (or &script_reports=true if the URL has other params) to see what is enqueued and in what order.
 
 == Description ==
 
@@ -25,14 +25,14 @@ Script Report audits and visualizes JavaScript and CSS script and style dependen
 = Access =
 
 * Users with Administrator capability (`manage_options`) can open the report
-* Add `?script_reports=true` to any admin or frontend URL when allowed
+* Add `?script_reports=true` to the URL, or `&script_reports=true` if the URL already has query parameters (e.g. `wp-admin/admin.php?page=wpuf-profile-forms` becomes `...&script_reports=true`)
 * Optional: set `define( 'SCRIPT_REPORT_DEBUG', true );` in wp-config.php to allow access without admin (e.g. local/dev). Do not enable on production unless needed temporarily
 
 == Installation ==
 
 1. Upload the plugin files to `wp-content/plugins/script-report/`, or install through the WordPress plugins screen.
 2. Activate the plugin through the Plugins screen.
-3. Add `?script_reports=true` to any admin or frontend URL (as an Administrator) to view the report.
+3. Add `?script_reports=true` to the URL, or `&script_reports=true` if the URL already has query parameters (as an Administrator) to view the report.
 
 == Frequently Asked Questions ==
 

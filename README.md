@@ -19,10 +19,11 @@ A WordPress plugin that audits and visualizes JS/CSS script and style dependenci
 ## Usage
 
 1. **Enable the report**  
-   Add `?script_reports=true` to any admin or frontend URL.
+   Add `?script_reports=true` to the URL, or `&script_reports=true` if the URL already has query parameters.
 
    Examples:
    - `https://yoursite.com/wp-admin/` → `https://yoursite.com/wp-admin/?script_reports=true`
+   - `https://yoursite.com/wp-admin/admin.php?page=wpuf-profile-forms` → `https://yoursite.com/wp-admin/admin.php?page=wpuf-profile-forms&script_reports=true`
    - `https://yoursite.com/some-page/` → `https://yoursite.com/some-page/?script_reports=true`
 
 2. **Who can see it**  

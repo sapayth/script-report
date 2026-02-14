@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+
+# IDE / editor
+.idea
+.vscode
+.cursor
+nbproject
+config.codekit
+
+# Dependencies
+node_modules
+vendor
+
+# Build / dist
+build
+dist
+*.zip
+
+# Local / secrets
+secret.json
+.env
+.env.*
+!.env.example
+
+# Logs and debug
+log.txt
+npm-debug.log
+phpcs-report.txt
