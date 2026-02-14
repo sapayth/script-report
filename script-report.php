@@ -3,6 +3,8 @@
  * Plugin Name: Script Report
  * Description: Audit and visualize JS/CSS script dependencies. Add ?script_reports=true to any admin or frontend URL (when allowed) to see the dependency report.
  * Version: 1.0.0
+ * Requires at least: 5.0
+ * Requires PHP: 7.4
  * Author: Sapayth H.
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html

@@ -141,7 +141,7 @@ class Script_Report {
 	 * @return string
 	 */
 	private function get_registration_source_from_backtrace() {
-		$trace      = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, self::BACKTRACE_FRAME_LIMIT );
+		$trace      = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, self::BACKTRACE_FRAME_LIMIT ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace
 		$wp_content = wp_normalize_path( WP_CONTENT_DIR );
 		$wp_includes = wp_normalize_path( ABSPATH . WPINC );
 
@@ -228,7 +228,15 @@ class Script_Report {
 			ob_end_clean();
 		}
 
-		$view_raw = isset( $_GET['view'] ) ? sanitize_key( wp_unslash( $_GET['view'] ) ) : '';
+		$view_raw = '';
+		if ( current_user_can( 'manage_options' ) || ( defined( 'SCRIPT_REPORT_DEBUG' ) && SCRIPT_REPORT_DEBUG ) ) {
+			$view_raw = isset( $_GET['view'] ) ? sanitize_key( wp_unslash( $_GET['view'] ) ) : '';
+		} elseif ( isset( $_GET['_wpnonce'] ) ) {
+			$nonce = sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) );
+			if ( wp_verify_nonce( $nonce, self::NONCE_ACTION ) && isset( $_GET['view'] ) ) {
+				$view_raw = sanitize_key( wp_unslash( $_GET['view'] ) );
+			}
+		}
 		$view     = $view_raw === 'tree' ? 'tree' : 'list';
 		$base_url = remove_query_arg( array( 'view' ) );
 		$list_url = add_query_arg( 'view', 'list', $base_url );
@@ -237,6 +245,8 @@ class Script_Report {
 		global $wp_scripts, $wp_styles, $wp_script_modules;
 
 		$report_css_url = plugin_dir_url( SCRIPT_REPORT_FILE ) . 'assets/report.css';
+		wp_register_style( 'script-report-report', $report_css_url, array(), SCRIPT_REPORT_VERSION );
+		wp_enqueue_style( 'script-report-report' );
 		?>
 		<!DOCTYPE html>
 		<html>
@@ -244,7 +254,7 @@ class Script_Report {
 			<meta charset="UTF-8">
 			<meta name="viewport" content="width=device-width, initial-scale=1">
 			<title><?php echo esc_html( __( 'Script & Style Report', 'script-report' ) ); ?></title>
-			<link rel="stylesheet" href="<?php echo esc_url( $report_css_url ); ?>?v=<?php echo esc_attr( SCRIPT_REPORT_VERSION ); ?>">
+			<?php wp_print_styles( 'script-report-report' ); ?>
 		</head>
 		<body>
 			<h1><?php echo esc_html( __( 'Script & Style Report', 'script-report' ) ); ?></h1>
@@ -489,7 +499,11 @@ class Script_Report {
 		$meta_reg     = __( 'registered on this site', 'script-report' );
 		$meta_enq     = __( 'requested by theme or plugins', 'script-report' );
 		$meta_loaded  = __( 'actually loaded (with dependencies)', 'script-report' );
-		$label_loaded = sprintf( __( '%s loaded', 'script-report' ), $item_name );
+		$label_loaded = sprintf(
+			// Translators: %s is the item name (e.g. 'Scripts', 'Styles').
+			 __( '%s loaded', 'script-report' ),
+			 esc_html( $item_name )
+			);
 		echo '<div class="stats">';
 		echo '<div class="stats-item"><strong>' . esc_html__( 'Registered', 'script-report' ) . '</strong> ' . (int) $registered . ' <span class="meta">' . esc_html( $meta_reg ) . '</span></div>';
 		echo '<div class="stats-item"><strong>' . esc_html__( 'Enqueued', 'script-report' ) . '</strong> ' . (int) $enqueued . ' <span class="meta">' . esc_html( $meta_enq ) . '</span></div>';
@@ -811,7 +825,7 @@ class Script_Report {
 				$rel = ltrim( str_replace( $wp_includes_url, '', $src ), '/' );
 				$file_path = wp_normalize_path( ABSPATH . WPINC . '/' . $rel );
 			} else {
-				$parsed = parse_url( $src );
+				$parsed = wp_parse_url( $src );
 				if ( ! empty( $parsed['path'] ) ) {
 					$file_path = wp_normalize_path( ABSPATH . ltrim( $parsed['path'], '/' ) );
 				}
