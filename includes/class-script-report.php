@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Script_Report {
 
-	const GET_PARAM             = 'script_reports';
+	const GET_PARAM             = 'script_report';
 	const NONCE_ACTION          = 'script_report_view';
 	const BACKTRACE_FRAME_LIMIT = 15;
 	const MAX_INDENT_DEPTH      = 5;

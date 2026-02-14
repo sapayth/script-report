@@ -19,12 +19,12 @@ A WordPress plugin that audits and visualizes JS/CSS script and style dependenci
 ## Usage
 
 1. **Enable the report**  
-   Add `?script_reports=true` to the URL, or `&script_reports=true` if the URL already has query parameters.
+   Add `?script_report=true` to the URL, or `&script_report=true` if the URL already has query parameters.
 
    Examples:
-   - `https://yoursite.com/wp-admin/` → `https://yoursite.com/wp-admin/?script_reports=true`
-   - `https://yoursite.com/wp-admin/admin.php?page=wpuf-profile-forms` → `https://yoursite.com/wp-admin/admin.php?page=wpuf-profile-forms&script_reports=true`
-   - `https://yoursite.com/some-page/` → `https://yoursite.com/some-page/?script_reports=true`
+   - `https://yoursite.com/wp-admin/` → `https://yoursite.com/wp-admin/?script_report=true`
+   - `https://yoursite.com/wp-admin/admin.php?page=wpuf-profile-forms` → `https://yoursite.com/wp-admin/admin.php?page=wpuf-profile-forms&script_report=true`
+   - `https://yoursite.com/some-page/` → `https://yoursite.com/some-page/?script_report=true`
 
 2. **Who can see it**  
    - Users with **Administrator** capability (`manage_options`) can always open the report.
@@ -47,13 +47,13 @@ A WordPress plugin that audits and visualizes JS/CSS script and style dependenci
   - “Enqueued by” (which top-level script pulled it in) and “Required by” (who depends on it)
 - **CSS** – Same structure for styles.
 - **Script modules (WP 6.5+)** – Registered and enqueued modules and their dependencies.
-- **List vs Tree** – Toggle with `?script_reports=true&view=list` (default) or `&view=tree`. Tree shows dependency chains and flags circular or missing deps.
+- **List vs Tree** – Toggle with `?script_report=true&view=list` (default) or `&view=tree`. Tree shows dependency chains and flags circular or missing deps.
 - **Filter** – Type in the filter box to narrow by handle or `src` (client-side).
 
 ## Security
 
 - Report is shown only if the user can `manage_options`, **or** `SCRIPT_REPORT_DEBUG` is defined and true, **or** the URL includes a valid `_wpnonce` for the `script_report_view` action (e.g. the “Script Report” admin bar link).
-- Nonce validation is used for nonced links; direct `?script_reports=true` still requires capability or `SCRIPT_REPORT_DEBUG`.
+- Nonce validation is used for nonced links; direct `?script_report=true` still requires capability or `SCRIPT_REPORT_DEBUG`.
 
 ## License
 

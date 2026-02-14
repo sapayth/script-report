@@ -2,7 +2,7 @@
 
 ## Trigger
 
-- Add `?script_reports=true` to any admin URL to replace the page with the dependency report.
+- Add `?script_report=true` to any admin URL to replace the page with the dependency report.
 
 ## JavaScript
 
