@@ -12,7 +12,7 @@ A WordPress plugin that audits and visualizes JS/CSS script and style dependenci
 1. Clone the repo into `wp-content/plugins/` so the plugin lives at `wp-content/plugins/script-report/`:
    ```bash
    cd wp-content/plugins
-   git clone https://github.com/sapayth/script-report.git script-report
+   git clone https://github.com/sapayth/script-report.git
    ```
 2. Activate the plugin in **Plugins** in the admin.
 
