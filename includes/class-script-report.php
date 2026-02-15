@@ -45,6 +45,10 @@ class Script_Report {
 		add_action( 'wp_register_script', array( $this, 'record_script_registration' ), 10, 5 );
 		add_action( 'wp_register_style', array( $this, 'record_style_registration' ), 10, 5 );
 		add_action( 'admin_bar_menu', array( $this, 'add_admin_bar_link' ), 100 );
+		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_panel_assets' ), 20 );
+		add_action( 'admin_enqueue_scripts', array( $this, 'maybe_enqueue_panel_assets' ), 20 );
+		add_action( 'wp_footer', array( $this, 'maybe_output_panel' ), 9998 );
+		add_action( 'admin_footer', array( $this, 'maybe_output_panel' ), 9998 );
 	}
 
 	/**
@@ -76,10 +80,35 @@ class Script_Report {
 	public function get_report_url( $args = array() ) {
 		$args[ self::GET_PARAM ] = 'true';
 		$args['_wpnonce']        = wp_create_nonce( self::NONCE_ACTION );
-		$base = is_admin()
-			? admin_url( 'index.php' )
-			: home_url( isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '/' );
+		$base = home_url( isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '/' );
 		return add_query_arg( $args, $base );
+	}
+
+	/**
+	 * Whether the current user can view the panel (and full report).
+	 *
+	 * @return bool
+	 */
+	public function user_can_view_panel() {
+		return current_user_can( 'manage_options' ) || ( defined( 'SCRIPT_REPORT_DEBUG' ) && SCRIPT_REPORT_DEBUG );
+	}
+
+	/**
+	 * Whether to collect registration sources (for both full report and panel).
+	 *
+	 * @return bool
+	 */
+	private function should_collect_sources() {
+		return $this->is_report_request() || $this->user_can_view_panel();
+	}
+
+	/**
+	 * Whether to output the panel on this request (not on full-report page).
+	 *
+	 * @return bool
+	 */
+	private function should_show_panel() {
+		return $this->user_can_view_panel() && ! $this->is_report_request();
 	}
 
 	/**
@@ -89,18 +118,259 @@ class Script_Report {
 		if ( ! $wp_admin_bar ) {
 			return;
 		}
-		if ( ! current_user_can( 'manage_options' ) && ( ! defined( 'SCRIPT_REPORT_DEBUG' ) || ! SCRIPT_REPORT_DEBUG ) ) {
+		if ( ! $this->user_can_view_panel() ) {
 			return;
 		}
-		$wp_admin_bar->add_node(
+			$wp_admin_bar->add_node(
 			array(
 				'id'     => 'script-report',
 				'title'  => __( 'Script Report', 'script-report' ),
-				'href'   => $this->get_report_url(),
-				'parent' => 'site-name',
+				'href'   => '#sr-overview',
 				'meta'   => array( 'class' => 'script-report-link' ),
 			)
 		);
+		$wp_admin_bar->add_node(
+			array(
+				'id'     => 'script-report-overview',
+				'title'  => __( 'Overview', 'script-report' ),
+				'href'   => '#sr-overview',
+				'parent' => 'script-report',
+			)
+		);
+		$wp_admin_bar->add_node(
+			array(
+				'id'     => 'script-report-scripts',
+				'title'  => __( 'JavaScript', 'script-report' ),
+				'href'   => '#sr-scripts',
+				'parent' => 'script-report',
+			)
+		);
+		$wp_admin_bar->add_node(
+			array(
+				'id'     => 'script-report-styles',
+				'title'  => __( 'CSS', 'script-report' ),
+				'href'   => '#sr-styles',
+				'parent' => 'script-report',
+			)
+		);
+		$wp_admin_bar->add_node(
+			array(
+				'id'     => 'script-report-full',
+				'title'  => __( 'Full Report', 'script-report' ),
+				'href'   => $this->get_report_url(),
+				'parent' => 'script-report',
+				'meta'   => array( 'target' => '_blank' ),
+			)
+		);
+	}
+
+	/**
+	 * Enqueue panel assets when the panel is shown on this request.
+	 */
+	public function maybe_enqueue_panel_assets() {
+		if ( ! $this->should_show_panel() ) {
+			return;
+		}
+		$base = plugin_dir_url( SCRIPT_REPORT_FILE );
+		wp_enqueue_style(
+			'script-report-panel',
+			$base . 'assets/panel.css',
+			array(),
+			SCRIPT_REPORT_VERSION
+		);
+		wp_enqueue_script(
+			'script-report-panel',
+			$base . 'assets/panel.js',
+			array(),
+			SCRIPT_REPORT_VERSION,
+			true
+		);
+		wp_enqueue_style(
+			'script-report-report',
+			$base . 'assets/report.css',
+			array(),
+			SCRIPT_REPORT_VERSION
+		);
+	}
+
+	/**
+	 * Output the panel HTML in the footer when the panel is shown.
+	 */
+	public function maybe_output_panel() {
+		if ( ! $this->should_show_panel() ) {
+			return;
+		}
+		$this->output_panel();
+	}
+
+	/**
+	 * Output the drawer/panel markup (Overview, JavaScript, CSS tabs).
+	 */
+	public function output_panel() {
+		global $wp_scripts, $wp_styles, $wp_script_modules;
+
+		$scripts_data = $wp_scripts ? $this->get_deps_report_data( $wp_scripts ) : null;
+		$styles_data  = $wp_styles ? $this->get_deps_report_data( $wp_styles ) : null;
+
+		echo '<!-- Begin Script Report panel -->' . "\n";
+		echo '<div id="script-report-main" class="sr-main script-report" aria-hidden="true">' . "\n";
+		echo '<div class="sr-title">' . "\n";
+		echo '<h2 class="sr-title-heading">' . esc_html__( 'Script Report', 'script-report' ) . '</h2>' . "\n";
+		echo '<button type="button" class="sr-close" aria-label="' . esc_attr__( 'Close panel', 'script-report' ) . '">&times;</button>' . "\n";
+		echo '</div>' . "\n";
+		echo '<div class="sr-wrapper">' . "\n";
+		echo '<nav id="sr-panel-menu" class="sr-panel-menu" aria-label="' . esc_attr__( 'Script Report sections', 'script-report' ) . '">' . "\n";
+		echo '<ul role="tablist">' . "\n";
+		echo '<li role="presentation"><button type="button" role="tab" class="sr-tab" data-sr-panel="#sr-overview" aria-selected="true">' . esc_html__( 'Overview', 'script-report' ) . '</button></li>' . "\n";
+		echo '<li role="presentation"><button type="button" role="tab" class="sr-tab" data-sr-panel="#sr-scripts" aria-selected="false">' . esc_html__( 'JavaScript', 'script-report' ) . '</button></li>' . "\n";
+		echo '<li role="presentation"><button type="button" role="tab" class="sr-tab" data-sr-panel="#sr-styles" aria-selected="false">' . esc_html__( 'CSS', 'script-report' ) . '</button></li>' . "\n";
+		echo '</ul>' . "\n";
+		echo '</nav>' . "\n";
+		echo '<div id="sr-panels" class="sr-panels">' . "\n";
+
+		echo '<div id="sr-overview" class="sr-panel sr-panel-show" role="tabpanel">' . "\n";
+		$this->output_panel_overview( $scripts_data, $styles_data, $wp_script_modules, $wp_scripts, $wp_styles );
+		echo '</div>' . "\n";
+
+		echo '<div id="sr-scripts" class="sr-panel" role="tabpanel">' . "\n";
+		if ( $wp_scripts && $scripts_data ) {
+			$this->render_deps_stats( $wp_scripts, count( $scripts_data['needed'] ), $scripts_data['total_size'], __( 'Scripts', 'script-report' ) );
+			$this->render_deps_list( $wp_scripts, $scripts_data['print_order'], $this->script_sources, true, $scripts_data );
+		} else {
+			echo '<p>' . esc_html__( 'No scripts data.', 'script-report' ) . '</p>';
+		}
+		echo '</div>' . "\n";
+
+		echo '<div id="sr-styles" class="sr-panel" role="tabpanel">' . "\n";
+		if ( $wp_styles && $styles_data ) {
+			$this->render_deps_stats( $wp_styles, count( $styles_data['needed'] ), $styles_data['total_size'], __( 'Styles', 'script-report' ) );
+			$this->render_deps_list( $wp_styles, $styles_data['print_order'], $this->style_sources, false, $styles_data );
+		} else {
+			echo '<p>' . esc_html__( 'No styles data.', 'script-report' ) . '</p>';
+		}
+		echo '</div>' . "\n";
+
+		echo '</div>' . "\n"; // #sr-panels
+		echo '</div>' . "\n"; // .sr-wrapper
+		echo '</div>' . "\n"; // #script-report-main
+		echo '<!-- End Script Report panel -->' . "\n";
+	}
+
+	/**
+	 * Output the Overview panel content (summary stats + abbreviated lists).
+	 *
+	 * @param array|null             $scripts_data From get_deps_report_data( wp_scripts ).
+	 * @param array|null             $styles_data  From get_deps_report_data( wp_styles ).
+	 * @param WP_Script_Modules|null $wp_script_modules Script modules instance.
+	 * @param WP_Scripts|null        $wp_scripts   Scripts dependency object.
+	 * @param WP_Styles|null         $wp_styles    Styles dependency object.
+	 */
+	private function output_panel_overview( $scripts_data, $styles_data, $wp_script_modules, $wp_scripts, $wp_styles ) {
+		$script_count = $scripts_data ? count( $scripts_data['needed'] ) : 0;
+		$script_size  = $scripts_data ? $scripts_data['total_size'] : 0;
+		$style_count  = $styles_data ? count( $styles_data['needed'] ) : 0;
+		$style_size   = $styles_data ? $styles_data['total_size'] : 0;
+
+		$module_count = 0;
+		if ( $wp_script_modules && method_exists( $wp_script_modules, 'get_enqueued' ) ) {
+			$module_count = count( $wp_script_modules->get_enqueued() );
+		}
+
+		echo '<div class="sr-overview-layout">';
+		echo '<div class="sr-overview-column">';
+		echo '<h3>' . esc_html__( 'JavaScript', 'script-report' ) . '</h3>';
+		echo '<div class="sr-overview-stats">' . (int) $script_count . ' ' . esc_html__( 'loaded', 'script-report' ) . ', ' . esc_html( $this->format_bytes( $script_size ) ) . '</div>';
+		if ( $wp_scripts && $scripts_data ) {
+			$this->render_abbr_list( $wp_scripts, $scripts_data['print_order'], $this->script_sources, true, $scripts_data );
+		}
+		echo '</div>';
+
+		echo '<div class="sr-overview-column">';
+		echo '<h3>' . esc_html__( 'CSS', 'script-report' ) . '</h3>';
+		echo '<div class="sr-overview-stats">' . (int) $style_count . ' ' . esc_html__( 'loaded', 'script-report' ) . ', ' . esc_html( $this->format_bytes( $style_size ) ) . '</div>';
+		if ( $wp_styles && $styles_data ) {
+			$this->render_abbr_list( $wp_styles, $styles_data['print_order'], $this->style_sources, false, $styles_data );
+		}
+		echo '</div>';
+		echo '</div>';
+
+		if ( $module_count > 0 ) {
+			echo '<div class="sr-modules-summary">' . esc_html__( 'Modules', 'script-report' ) . ': ' . (int) $module_count . ' ' . esc_html__( 'enqueued', 'script-report' ) . '</div>';
+		}
+	}
+
+	/**
+	 * Render abbreviated list for overview panel (top items + "see more" link).
+	 *
+	 * @param WP_Scripts|WP_Styles $wp_deps     Dependency object.
+	 * @param array                $print_order Ordered handles.
+	 * @param array                $sources     Handle => registration source label.
+	 * @param bool                 $is_script   True for scripts, false for styles.
+	 * @param array                $report_data Precomputed data from get_deps_report_data().
+	 */
+	private function render_abbr_list( $wp_deps, $print_order, $sources, $is_script, $report_data ) {
+		$needed        = $report_data['needed'];
+		$all_handles   = array_keys( $needed );
+		$abbr_count    = 5; // Show top 5 items in overview.
+		$order_map     = array_flip( $print_order );
+
+		echo '<div class="sr-abbr-list">';
+		$shown = 0;
+
+		foreach ( $all_handles as $handle ) {
+			if ( ! isset( $wp_deps->registered[ $handle ] ) ) {
+				continue;
+			}
+
+			if ( $shown >= $abbr_count ) {
+				break;
+			}
+
+			$item        = $wp_deps->registered[ $handle ];
+			$is_enqueued = in_array( $handle, $wp_deps->queue, true );
+			$order_pos   = isset( $order_map[ $handle ] ) ? $order_map[ $handle ] + 1 : null;
+			$file_size   = $this->get_file_size( $item->src );
+
+			echo '<div class="sr-abbr-item">';
+			echo '<span class="handle">' . esc_html( $handle ) . '</span>';
+
+			$badges = array();
+			if ( $order_pos !== null ) {
+				$badges[] = '<span class="order-badge">#' . (int) $order_pos . '</span>';
+			}
+			if ( $file_size !== null ) {
+				$badges[] = '<span class="size-badge">' . esc_html( $this->format_bytes( $file_size ) ) . '</span>';
+			}
+			if ( $is_enqueued ) {
+				$badges[] = '<span class="badge badge-enqueued">' . esc_html__( 'ENQUEUED', 'script-report' ) . '</span>';
+			}
+			if ( $is_script && ! empty( $item->extra['group'] ) ) {
+				$badges[] = '<span class="badge badge-footer">' . esc_html__( 'FOOTER', 'script-report' ) . '</span>';
+			}
+			if ( $is_script && ! empty( $item->extra['data'] ) ) {
+				$len      = strlen( $item->extra['data'] );
+				$badges[] = '<span class="badge badge-inline">' . esc_html__( 'INLINE', 'script-report' ) . ' ' . esc_html( $this->format_bytes( $len ) ) . '</span>';
+			}
+
+			if ( ! empty( $badges ) ) {
+				echo ' ' . implode( ' ', $badges );
+			}
+
+			if ( isset( $sources[ $handle ] ) ) {
+				echo '<div class="meta-item">' . esc_html( $sources[ $handle ] ) . '</div>';
+			}
+
+			echo '</div>';
+			$shown++;
+		}
+
+		$remaining = count( $all_handles ) - $abbr_count;
+		if ( $remaining > 0 ) {
+			$panel_id = $is_script ? '#sr-scripts' : '#sr-styles';
+			echo '<div class="sr-see-more"><a href="' . esc_attr( $panel_id ) . '" data-sr-panel="' . esc_attr( $panel_id ) . '">' . sprintf( esc_html__( 'See %d more', 'script-report' ), $remaining ) . '</a></div>';
+		}
+
+		echo '</div>';
 	}
 
 	/**
@@ -113,7 +383,7 @@ class Script_Report {
 	 * @param bool   $in_footer In footer.
 	 */
 	public function record_script_registration( $handle, $src, $deps, $ver, $in_footer ) {
-		if ( ! $this->is_report_request() ) {
+		if ( ! $this->should_collect_sources() ) {
 			return;
 		}
 		$this->script_sources[ $handle ] = $this->get_registration_source_from_backtrace();
@@ -129,7 +399,7 @@ class Script_Report {
 	 * @param string $media  Media.
 	 */
 	public function record_style_registration( $handle, $src, $deps, $ver, $media ) {
-		if ( ! $this->is_report_request() ) {
+		if ( ! $this->should_collect_sources() ) {
 			return;
 		}
 		$this->style_sources[ $handle ] = $this->get_registration_source_from_backtrace();
@@ -257,6 +527,7 @@ class Script_Report {
 			<?php wp_print_styles( 'script-report-report' ); ?>
 		</head>
 		<body>
+			<div class="script-report">
 			<h1><?php echo esc_html( __( 'Script & Style Report', 'script-report' ) ); ?></h1>
 			<div class="stats">
 				<div class="stats-item"><strong><?php echo esc_html( __( 'Generated', 'script-report' ) ); ?></strong> <?php echo esc_html( current_time( 'Y-m-d H:i:s' ) ); ?></div>
@@ -318,6 +589,7 @@ class Script_Report {
 				});
 			})();
 			</script>
+			</div>
 		</body>
 		</html>
 		<?php

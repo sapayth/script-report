@@ -1,8 +1,16 @@
-* {
+/**
+ * Script Report styles. Scoped under .script-report to avoid conflicting with WP core.
+ * Used for both the full-page report and the panel content.
+ *
+ * @package Script_Report
+ */
+
+.script-report,
+.script-report * {
 	box-sizing: border-box;
 }
 
-body {
+.script-report {
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 	padding: 2rem;
 	background: #ffffff;
@@ -13,7 +21,13 @@ body {
 	font-size: 15px;
 }
 
-h1 {
+#script-report-main.script-report {
+	max-width: none;
+	padding: 0;
+	margin: 0;
+}
+
+.script-report h1 {
 	color: #0d120c;
 	font-size: 1.5rem;
 	font-weight: 600;
@@ -21,7 +35,7 @@ h1 {
 	letter-spacing: -0.02em;
 }
 
-h2 {
+.script-report h2 {
 	color: #1e2a1c;
 	font-size: 1.125rem;
 	font-weight: 600;
@@ -30,14 +44,14 @@ h2 {
 	border-bottom: 1px solid #d4e0d2;
 }
 
-h3 {
+.script-report h3 {
 	color: #2d3b2a;
 	font-size: 0.9375rem;
 	font-weight: 500;
 	margin: 1.5rem 0 0.75rem 0;
 }
 
-.stats {
+.script-report .stats {
 	background: #f5f9f4;
 	border: 1px solid #e0eadc;
 	border-radius: 8px;
@@ -45,28 +59,28 @@ h3 {
 	margin: 1rem 0 1.5rem 0;
 }
 
-.stats-item {
+.script-report .stats-item {
 	margin: 0.35rem 0;
 	font-size: 0.875rem;
 	color: #3d4a3a;
 }
 
-.stats-item strong {
+.script-report .stats-item strong {
 	color: #1a1f1a;
 	font-weight: 500;
 }
 
-.stats .meta {
+.script-report .stats .meta {
 	color: #5c6e58;
 	font-size: 0.8125rem;
 	margin-left: 0.25rem;
 }
 
-.section {
+.script-report .section {
 	margin: 2rem 0;
 }
 
-.report-toolbar {
+.script-report .report-toolbar {
 	display: flex;
 	gap: 0.5rem;
 	align-items: center;
@@ -74,7 +88,7 @@ h3 {
 	margin-bottom: 1rem;
 }
 
-.report-toolbar a {
+.script-report .report-toolbar a {
 	padding: 0.4rem 0.75rem;
 	background: #f0f4ee;
 	color: #3d4a3a;
@@ -85,18 +99,18 @@ h3 {
 	transition: background 0.15s, color 0.15s;
 }
 
-.report-toolbar a:hover {
+.script-report .report-toolbar a:hover {
 	background: #e5ebe2;
 	color: #1a1f1a;
 }
 
-.report-toolbar a.active {
+.script-report .report-toolbar a.active {
 	background: #234a1e;
 	color: #e8f5e6;
 	border-color: #2d5c28;
 }
 
-.report-toolbar input.filter {
+.script-report .report-toolbar input.filter {
 	padding: 0.4rem 0.75rem;
 	background: #ffffff;
 	border: 1px solid #d4e0d2;
@@ -106,20 +120,20 @@ h3 {
 	min-width: 180px;
 }
 
-.report-toolbar input.filter::placeholder {
+.script-report .report-toolbar input.filter::placeholder {
 	color: #7a8a76;
 }
 
-.report-toolbar input.filter:focus {
+.script-report .report-toolbar input.filter:focus {
 	outline: none;
 	border-color: #2d5c28;
 }
 
-.list-view {
+.script-report .list-view {
 	margin: 1rem 0;
 }
 
-.list-item {
+.script-report .list-item {
 	background: #fafcf9;
 	border: 1px solid #e8efe6;
 	border-radius: 6px;
@@ -131,12 +145,12 @@ h3 {
 	flex-wrap: wrap;
 }
 
-.list-item-main {
+.script-report .list-item-main {
 	flex: 1;
 	min-width: 260px;
 }
 
-.list-item-meta {
+.script-report .list-item-meta {
 	color: #5c6e58;
 	font-size: 0.8125rem;
 	display: flex;
@@ -144,32 +158,32 @@ h3 {
 	flex-wrap: wrap;
 }
 
-.meta-item {
+.script-report .meta-item {
 	display: flex;
 	gap: 0.35rem;
 	align-items: baseline;
 }
 
-.meta-label {
+.script-report .meta-label {
 	color: #4a5c46;
 	font-weight: 500;
 }
 
-.handle {
+.script-report .handle {
 	color: #0d120c;
 	font-weight: 500;
 	font-size: 0.875rem;
 	font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
 }
 
-.script-list {
+.script-report .script-list {
 	display: inline;
 	color: #1e5c1a;
 	font-family: 'SF Mono', Monaco, monospace;
 	font-size: 0.8125rem;
 }
 
-.size-badge {
+.script-report .size-badge {
 	display: inline-block;
 	background: #e8efe6;
 	color: #3d4a3a;
@@ -181,7 +195,7 @@ h3 {
 	font-family: 'SF Mono', Monaco, monospace;
 }
 
-.order-badge {
+.script-report .order-badge {
 	display: inline-block;
 	background: #e8efe6;
 	color: #4a5c46;
@@ -193,7 +207,7 @@ h3 {
 	font-family: 'SF Mono', Monaco, monospace;
 }
 
-.badge {
+.script-report .badge {
 	display: inline-block;
 	padding: 0.2rem 0.5rem;
 	margin-left: 0.5rem;
@@ -204,67 +218,67 @@ h3 {
 	letter-spacing: 0.03em;
 }
 
-.badge-enqueued {
+.script-report .badge-enqueued {
 	background: #d4ecd2;
 	color: #1e4a1a;
 }
 
-.badge-footer {
+.script-report .badge-footer {
 	background: #d8e8e4;
 	color: #1e3d3a;
 }
 
-.badge-inline {
+.script-report .badge-inline {
 	background: #f0ead4;
 	color: #5c4a1a;
 }
 
-.badge-module {
+.script-report .badge-module {
 	background: #e8e0f0;
 	color: #3d2a5c;
 }
 
-.badge-duplicate {
+.script-report .badge-duplicate {
 	background: #f5e0e2;
 	color: #8a2a2a;
 }
 
-.badge-missing {
+.script-report .badge-missing {
 	background: #f5e0e0;
 	color: #8a2a2a;
 }
 
-.badge-circular {
+.script-report .badge-circular {
 	background: #f0ead4;
 	color: #6e5a1a;
 }
 
-.tree-view .node {
+.script-report .tree-view .node {
 	padding: 0.4rem 0;
 	padding-left: calc(var(--depth, 0) * 1.25rem);
 	border-left: 1px solid transparent;
 	margin: 0.1rem 0;
 }
 
-.tree-view .node .src {
+.script-report .tree-view .node .src {
 	color: #5c6e58;
 	font-size: 0.8125rem;
 	margin-top: 0.2rem;
 }
 
-.tree-view .indent-0 { --depth: 0; }
-.tree-view .indent-1 { --depth: 1; }
-.tree-view .indent-2 { --depth: 2; }
-.tree-view .indent-3 { --depth: 3; }
-.tree-view .indent-4 { --depth: 4; }
-.tree-view .indent-5 { --depth: 5; }
+.script-report .tree-view .indent-0 { --depth: 0; }
+.script-report .tree-view .indent-1 { --depth: 1; }
+.script-report .tree-view .indent-2 { --depth: 2; }
+.script-report .tree-view .indent-3 { --depth: 3; }
+.script-report .tree-view .indent-4 { --depth: 4; }
+.script-report .tree-view .indent-5 { --depth: 5; }
 
-.tree-view .node .meta {
+.script-report .tree-view .node .meta {
 	color: #5c6e58;
 	font-size: 0.8125rem;
 }
 
-.list-item.hidden,
-.tree-view .node.hidden {
+.script-report .list-item.hidden,
+.script-report .tree-view .node.hidden {
 	display: none !important;
 }
