@@ -14,7 +14,9 @@
 	z-index: 99998;
 	display: none;
 	flex-direction: column;
-	max-height: 85vh;
+	height: 33.33vh;
+	min-height: 150px;
+	max-height: 90vh;
 	background: #fff;
 	border-top: 1px solid #d4e0d2;
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -28,12 +30,53 @@
 	display: flex;
 }
 
+#script-report-main.sr-resizing {
+	user-select: none;
+	transition: none;
+}
+
+/* Resize handle at the top of the panel */
+#script-report-main .sr-resize-handle {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 6px;
+	cursor: ns-resize;
+	background: transparent;
+	z-index: 1;
+}
+
+#script-report-main .sr-resize-handle::before {
+	content: '';
+	position: absolute;
+	top: 2px;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 50px;
+	height: 3px;
+	background: #c4d4c0;
+	border-radius: 2px;
+	opacity: 0;
+	transition: opacity 0.2s;
+}
+
+#script-report-main:hover .sr-resize-handle::before,
+#script-report-main .sr-resize-handle:hover::before {
+	opacity: 1;
+}
+
+#script-report-main .sr-resize-handle:hover::before {
+	background: #2d5c28;
+}
+
 #script-report-main .sr-title {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	flex-shrink: 0;
 	padding: 0.5rem 1rem;
+	padding-top: 0.75rem;
 	background: #f5f9f4;
 	border-bottom: 1px solid #e0eadc;
 }

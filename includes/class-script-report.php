@@ -214,6 +214,7 @@ class Script_Report {
 
 		echo '<!-- Begin Script Report panel -->' . "\n";
 		echo '<div id="script-report-main" class="sr-main script-report" aria-hidden="true">' . "\n";
+		echo '<div class="sr-resize-handle" aria-label="' . esc_attr__( 'Drag to resize panel', 'script-report' ) . '"></div>' . "\n";
 		echo '<div class="sr-title">' . "\n";
 		echo '<h2 class="sr-title-heading">' . esc_html__( 'Script Report', 'script-report' ) . '</h2>' . "\n";
 		echo '<button type="button" class="sr-close" aria-label="' . esc_attr__( 'Close panel', 'script-report' ) . '">&times;</button>' . "\n";

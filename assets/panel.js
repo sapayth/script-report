@@ -16,6 +16,57 @@
 	var tabs = main.querySelectorAll('.sr-tab');
 	var panels = main.querySelectorAll('.sr-panel');
 	var closeBtn = main.querySelector('.sr-close');
+	var resizeHandle = main.querySelector('.sr-resize-handle');
+
+	// Panel resize functionality
+	var isResizing = false;
+	var startY = 0;
+	var startHeight = 0;
+
+	function startResize(e) {
+		if (e.target !== resizeHandle) {
+			return;
+		}
+		isResizing = true;
+		startY = e.clientY;
+		startHeight = main.offsetHeight;
+		main.classList.add('sr-resizing');
+		document.body.style.cursor = 'ns-resize';
+		e.preventDefault();
+	}
+
+	function doResize(e) {
+		if (!isResizing) {
+			return;
+		}
+		var deltaY = startY - e.clientY;
+		var newHeight = startHeight + deltaY;
+		var minHeight = 150;
+		var maxHeight = window.innerHeight * 0.9;
+
+		if (newHeight < minHeight) {
+			newHeight = minHeight;
+		} else if (newHeight > maxHeight) {
+			newHeight = maxHeight;
+		}
+
+		main.style.height = newHeight + 'px';
+		e.preventDefault();
+	}
+
+	function stopResize() {
+		if (isResizing) {
+			isResizing = false;
+			main.classList.remove('sr-resizing');
+			document.body.style.cursor = '';
+		}
+	}
+
+	if (resizeHandle) {
+		resizeHandle.addEventListener('mousedown', startResize);
+		document.addEventListener('mousemove', doResize);
+		document.addEventListener('mouseup', stopResize);
+	}
 
 	function showPanel(panelId) {
 		var target = typeof panelId === 'string' ? document.querySelector(panelId) : panelId;
