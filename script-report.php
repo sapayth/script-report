@@ -18,6 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 define( 'SCRIPT_REPORT_FILE', __FILE__ );
+define( 'SCRIPT_REPORT_PATH', plugin_dir_path( SCRIPT_REPORT_FILE ) );
 define( 'SCRIPT_REPORT_VERSION', '1.0.0' );
 
 require_once __DIR__ . '/includes/class-script-report.php';

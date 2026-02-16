@@ -47,8 +47,8 @@ class Script_Report {
 		add_action( 'admin_bar_menu', array( $this, 'add_admin_bar_link' ), 100 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_panel_assets' ), 20 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'maybe_enqueue_panel_assets' ), 20 );
-		add_action( 'wp_footer', array( $this, 'maybe_output_panel' ), 9998 );
-		add_action( 'admin_footer', array( $this, 'maybe_output_panel' ), 9998 );
+		add_action( 'wp_footer', array( $this, 'maybe_output_panel' ), 10 );
+		add_action( 'admin_footer', array( $this, 'maybe_output_panel' ), 10 );
 	}
 
 	/**
@@ -209,52 +209,12 @@ class Script_Report {
 	public function output_panel() {
 		global $wp_scripts, $wp_styles, $wp_script_modules;
 
-		$scripts_data = $wp_scripts ? $this->get_deps_report_data( $wp_scripts ) : null;
-		$styles_data  = $wp_styles ? $this->get_deps_report_data( $wp_styles ) : null;
+		$title          = __( 'Script Report', 'script-report' );
+		$script_report  = $this;
+		$script_sources = $this->script_sources;
+		$style_sources  = $this->style_sources;
 
-		echo '<!-- Begin Script Report panel -->' . "\n";
-		echo '<div id="script-report-main" class="sr-main script-report" aria-hidden="true">' . "\n";
-		echo '<div class="sr-resize-handle" aria-label="' . esc_attr__( 'Drag to resize panel', 'script-report' ) . '"></div>' . "\n";
-		echo '<div class="sr-title">' . "\n";
-		echo '<h2 class="sr-title-heading">' . esc_html__( 'Script Report', 'script-report' ) . '</h2>' . "\n";
-		echo '<button type="button" class="sr-close" aria-label="' . esc_attr__( 'Close panel', 'script-report' ) . '">&times;</button>' . "\n";
-		echo '</div>' . "\n";
-		echo '<div class="sr-wrapper">' . "\n";
-		echo '<nav id="sr-panel-menu" class="sr-panel-menu" aria-label="' . esc_attr__( 'Script Report sections', 'script-report' ) . '">' . "\n";
-		echo '<ul role="tablist">' . "\n";
-		echo '<li role="presentation"><button type="button" role="tab" class="sr-tab" data-sr-panel="#sr-overview" aria-selected="true">' . esc_html__( 'Overview', 'script-report' ) . '</button></li>' . "\n";
-		echo '<li role="presentation"><button type="button" role="tab" class="sr-tab" data-sr-panel="#sr-scripts" aria-selected="false">' . esc_html__( 'JavaScript', 'script-report' ) . '</button></li>' . "\n";
-		echo '<li role="presentation"><button type="button" role="tab" class="sr-tab" data-sr-panel="#sr-styles" aria-selected="false">' . esc_html__( 'CSS', 'script-report' ) . '</button></li>' . "\n";
-		echo '</ul>' . "\n";
-		echo '</nav>' . "\n";
-		echo '<div id="sr-panels" class="sr-panels">' . "\n";
-
-		echo '<div id="sr-overview" class="sr-panel sr-panel-show" role="tabpanel">' . "\n";
-		$this->output_panel_overview( $scripts_data, $styles_data, $wp_script_modules, $wp_scripts, $wp_styles );
-		echo '</div>' . "\n";
-
-		echo '<div id="sr-scripts" class="sr-panel" role="tabpanel">' . "\n";
-		if ( $wp_scripts && $scripts_data ) {
-			$this->render_deps_stats( $wp_scripts, count( $scripts_data['needed'] ), $scripts_data['total_size'], __( 'Scripts', 'script-report' ) );
-			$this->render_deps_list( $wp_scripts, $scripts_data['print_order'], $this->script_sources, true, $scripts_data );
-		} else {
-			echo '<p>' . esc_html__( 'No scripts data.', 'script-report' ) . '</p>';
-		}
-		echo '</div>' . "\n";
-
-		echo '<div id="sr-styles" class="sr-panel" role="tabpanel">' . "\n";
-		if ( $wp_styles && $styles_data ) {
-			$this->render_deps_stats( $wp_styles, count( $styles_data['needed'] ), $styles_data['total_size'], __( 'Styles', 'script-report' ) );
-			$this->render_deps_list( $wp_styles, $styles_data['print_order'], $this->style_sources, false, $styles_data );
-		} else {
-			echo '<p>' . esc_html__( 'No styles data.', 'script-report' ) . '</p>';
-		}
-		echo '</div>' . "\n";
-
-		echo '</div>' . "\n"; // #sr-panels
-		echo '</div>' . "\n"; // .sr-wrapper
-		echo '</div>' . "\n"; // #script-report-main
-		echo '<!-- End Script Report panel -->' . "\n";
+		require SCRIPT_REPORT_PATH . 'templates/panel.php';
 	}
 
 	/**
