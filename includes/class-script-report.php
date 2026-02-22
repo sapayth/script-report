@@ -38,9 +38,7 @@ class Script_Report {
 	 * Constructor.
 	 */
 	public function __construct() {
-		add_action( 'admin_init', array( $this, 'maybe_start_buffer' ) );
 		add_action( 'admin_footer', array( $this, 'maybe_dump_dependencies' ), PHP_INT_MAX );
-		add_action( 'template_redirect', array( $this, 'maybe_start_buffer' ) );
 		add_action( 'wp_footer', array( $this, 'maybe_dump_dependencies' ), PHP_INT_MAX );
 		add_action( 'wp_register_script', array( $this, 'record_script_registration' ), 10, 5 );
 		add_action( 'wp_register_style', array( $this, 'record_style_registration' ), 10, 5 );
@@ -207,7 +205,7 @@ class Script_Report {
 	 * Output the drawer/panel markup (Overview, JavaScript, CSS tabs).
 	 */
 	public function output_panel() {
-		global $wp_scripts, $wp_styles, $wp_script_modules;
+		global $wp_scripts, $wp_styles, $wp_script_modules; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- WP core globals.
 
 		$title          = __( 'Script Report', 'script-report' );
 		$script_report  = $this;
@@ -314,7 +312,7 @@ class Script_Report {
 			}
 
 			if ( ! empty( $badges ) ) {
-				echo ' ' . implode( ' ', $badges );
+				echo ' ' . wp_kses_post( implode( ' ', $badges ) );
 			}
 
 			if ( isset( $sources[ $handle ] ) ) {
@@ -328,7 +326,8 @@ class Script_Report {
 		$remaining = count( $all_handles ) - $abbr_count;
 		if ( $remaining > 0 ) {
 			$panel_id = $is_script ? '#sr-scripts' : '#sr-styles';
-			echo '<div class="sr-see-more"><a href="' . esc_attr( $panel_id ) . '" data-sr-panel="' . esc_attr( $panel_id ) . '">' . sprintf( esc_html__( 'See %d more', 'script-report' ), $remaining ) . '</a></div>';
+			// Translators: %d is the number of additional items not shown in the abbreviated list.
+			echo '<div class="sr-see-more"><a href="' . esc_url( $panel_id ) . '" data-sr-panel="' . esc_attr( $panel_id ) . '">' . sprintf( esc_html__( 'See %d more', 'script-report' ), (int) $remaining ) . '</a></div>';
 		}
 
 		echo '</div>';
@@ -439,25 +438,33 @@ class Script_Report {
 	}
 
 	/**
-	 * Start output buffering when report is requested.
-	 */
-	public function maybe_start_buffer() {
-		if ( $this->is_report_request() ) {
-			ob_start();
-		}
-	}
-
-	/**
 	 * Output report and exit when report is requested.
+	 * Opens an output buffer, builds the report HTML, discards any prior output, then sends the report.
 	 */
 	public function maybe_dump_dependencies() {
 		if ( ! $this->is_report_request() ) {
 			return;
 		}
 
+		// Buffer the report output so we can discard all prior page output before sending it.
+		ob_start();
+		$this->render_full_report();
+		$report_html = ob_get_clean();
+
+		// Discard all output buffered by WordPress and anything that ran before this footer hook.
 		while ( ob_get_level() > 0 ) {
 			ob_end_clean();
 		}
+
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- full HTML document, already escaped internally.
+		echo $report_html;
+		die();
+	}
+
+	/**
+	 * Render the full standalone report HTML document.
+	 */
+	private function render_full_report() {
 
 		$view_raw = '';
 		if ( current_user_can( 'manage_options' ) || ( defined( 'SCRIPT_REPORT_DEBUG' ) && SCRIPT_REPORT_DEBUG ) ) {
@@ -473,11 +480,35 @@ class Script_Report {
 		$list_url = add_query_arg( 'view', 'list', $base_url );
 		$tree_url = add_query_arg( 'view', 'tree', $base_url );
 
-		global $wp_scripts, $wp_styles, $wp_script_modules;
+		global $wp_scripts, $wp_styles, $wp_script_modules; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- WP core globals.
 
-		$report_css_url = plugin_dir_url( SCRIPT_REPORT_FILE ) . 'assets/report.css';
+		$base_plugin_url = plugin_dir_url( SCRIPT_REPORT_FILE );
+
+		$report_css_url = $base_plugin_url . 'assets/report.css';
 		wp_register_style( 'script-report-report', $report_css_url, array(), SCRIPT_REPORT_VERSION );
 		wp_enqueue_style( 'script-report-report' );
+
+		// Register a placeholder script handle so we can attach inline JS via wp_add_inline_script().
+		wp_register_script( 'script-report-report', false, array(), SCRIPT_REPORT_VERSION, true );
+		wp_enqueue_script( 'script-report-report' );
+		wp_add_inline_script(
+			'script-report-report',
+			'(function(){
+				var inputs = document.querySelectorAll(\'.report-toolbar input.filter\');
+				inputs.forEach(function(input) {
+					var section = input.closest(\'.section\');
+					var list = section.querySelector(\'.list-view\');
+					var tree = section.querySelector(\'.tree-view\');
+					var items = list ? list.querySelectorAll(\'.list-item\') : [];
+					var nodes = tree ? tree.querySelectorAll(\'.node\') : [];
+					input.addEventListener(\'input\', function() {
+						var q = (this.value || \'\').toLowerCase();
+						items.forEach(function(el) { el.classList.toggle(\'hidden\', q && el.textContent.toLowerCase().indexOf(q) === -1); });
+						nodes.forEach(function(el) { el.classList.toggle(\'hidden\', q && el.textContent.toLowerCase().indexOf(q) === -1); });
+					});
+				});
+			})();'
+		);
 		?>
 		<!DOCTYPE html>
 		<html>
@@ -533,28 +564,11 @@ class Script_Report {
 				</div>
 			<?php endif; ?>
 
-			<script>
-			(function(){
-				var inputs = document.querySelectorAll('.report-toolbar input.filter');
-				inputs.forEach(function(input) {
-					var section = input.closest('.section');
-					var list = section.querySelector('.list-view');
-					var tree = section.querySelector('.tree-view');
-					var items = list ? list.querySelectorAll('.list-item') : [];
-					var nodes = tree ? tree.querySelectorAll('.node') : [];
-					input.addEventListener('input', function() {
-						var q = (this.value || '').toLowerCase();
-						items.forEach(function(el) { el.classList.toggle('hidden', q && el.textContent.toLowerCase().indexOf(q) === -1); });
-						nodes.forEach(function(el) { el.classList.toggle('hidden', q && el.textContent.toLowerCase().indexOf(q) === -1); });
-					});
-				});
-			})();
-			</script>
+			<?php wp_print_scripts( 'script-report-report' ); ?>
 			</div>
 		</body>
 		</html>
 		<?php
-		die();
 	}
 
 	/**

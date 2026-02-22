@@ -8,7 +8,7 @@ Tested up to: 6.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Audit and visualize JS/CSS script dependencies. Add ?script_report=true (or &script_report=true if the URL has other params) to see what is enqueued and in what order.
+Audit and visualize JS/CSS script dependencies. Add ?script_report=true to any page URL to see what is enqueued, in what order, and who required it.
 
 == Description ==
 

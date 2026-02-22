@@ -17,10 +17,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$script_count = $scripts_data ? count( $scripts_data['needed'] ) : 0;
-$script_size  = $scripts_data ? $scripts_data['total_size'] : 0;
-$style_count  = $styles_data ? count( $styles_data['needed'] ) : 0;
-$style_size   = $styles_data ? $styles_data['total_size'] : 0;
+$script_report_count = $scripts_data ? count( $scripts_data['needed'] ) : 0;
+$script_report_size  = $scripts_data ? $scripts_data['total_size'] : 0;
+$script_report_style_count = $styles_data ? count( $styles_data['needed'] ) : 0;
+$script_report_style_size  = $styles_data ? $styles_data['total_size'] : 0;
 ?>
 <div id="sr-overview" class="sr-panel sr-panel-show" role="tabpanel">
 	<div class="sr-overview-layout">
@@ -28,7 +28,7 @@ $style_size   = $styles_data ? $styles_data['total_size'] : 0;
 		<div class="sr-overview-column">
 			<h3><?php echo esc_html__( 'JavaScript', 'script-report' ); ?></h3>
 			<div class="sr-overview-stats">
-				<?php echo (int) $script_count; ?> <?php echo esc_html__( 'loaded', 'script-report' ); ?>, <?php echo esc_html( $script_report->format_bytes( $script_size ) ); ?>
+				<?php echo (int) $script_report_count; ?> <?php echo esc_html__( 'loaded', 'script-report' ); ?>, <?php echo esc_html( $script_report->format_bytes( $script_report_size ) ); ?>
 			</div>
 			<?php if ( $wp_scripts && $scripts_data ) : ?>
 				<?php $script_report->render_abbr_list( $wp_scripts, $scripts_data['print_order'], $script_sources, true, $scripts_data ); ?>
@@ -39,7 +39,7 @@ $style_size   = $styles_data ? $styles_data['total_size'] : 0;
 		<div class="sr-overview-column">
 			<h3><?php echo esc_html__( 'CSS', 'script-report' ); ?></h3>
 			<div class="sr-overview-stats">
-				<?php echo (int) $style_count; ?> <?php echo esc_html__( 'loaded', 'script-report' ); ?>, <?php echo esc_html( $script_report->format_bytes( $style_size ) ); ?>
+				<?php echo (int) $script_report_style_count; ?> <?php echo esc_html__( 'loaded', 'script-report' ); ?>, <?php echo esc_html( $script_report->format_bytes( $script_report_style_size ) ); ?>
 			</div>
 			<?php if ( $wp_styles && $styles_data ) : ?>
 				<?php $script_report->render_abbr_list( $wp_styles, $styles_data['print_order'], $style_sources, false, $styles_data ); ?>

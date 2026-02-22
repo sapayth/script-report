@@ -16,6 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Variables inherited from output_panel() scope; $wp_scripts, $wp_styles, $wp_script_modules are WP core globals.
 $scripts_data = $wp_scripts ? $script_report->get_deps_report_data( $wp_scripts ) : null;
 $styles_data  = $wp_styles ? $script_report->get_deps_report_data( $wp_styles ) : null;
 
