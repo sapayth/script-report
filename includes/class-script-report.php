@@ -205,7 +205,9 @@ class Script_Report {
 	 * Output the drawer/panel markup (Overview, JavaScript, CSS tabs).
 	 */
 	public function output_panel() {
-		global $wp_scripts, $wp_styles, $wp_script_modules; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- WP core globals.
+		$wp_scripts        = wp_scripts();
+		$wp_styles         = wp_styles();
+		$script_report_modules = function_exists( 'wp_script_modules' ) ? wp_script_modules() : null;
 
 		$title          = __( 'Script Report', 'script-report' );
 		$script_report  = $this;
@@ -220,19 +222,19 @@ class Script_Report {
 	 *
 	 * @param array|null             $scripts_data From get_deps_report_data( wp_scripts ).
 	 * @param array|null             $styles_data  From get_deps_report_data( wp_styles ).
-	 * @param WP_Script_Modules|null $wp_script_modules Script modules instance.
+	 * @param WP_Script_Modules|null $script_report_modules Script modules instance.
 	 * @param WP_Scripts|null        $wp_scripts   Scripts dependency object.
 	 * @param WP_Styles|null         $wp_styles    Styles dependency object.
 	 */
-	private function output_panel_overview( $scripts_data, $styles_data, $wp_script_modules, $wp_scripts, $wp_styles ) {
+	private function output_panel_overview( $scripts_data, $styles_data, $script_report_modules, $wp_scripts, $wp_styles ) {
 		$script_count = $scripts_data ? count( $scripts_data['needed'] ) : 0;
 		$script_size  = $scripts_data ? $scripts_data['total_size'] : 0;
 		$style_count  = $styles_data ? count( $styles_data['needed'] ) : 0;
 		$style_size   = $styles_data ? $styles_data['total_size'] : 0;
 
 		$module_count = 0;
-		if ( $wp_script_modules && method_exists( $wp_script_modules, 'get_enqueued' ) ) {
-			$module_count = count( $wp_script_modules->get_enqueued() );
+		if ( $script_report_modules && method_exists( $script_report_modules, 'get_enqueued' ) ) {
+			$module_count = count( $script_report_modules->get_enqueued() );
 		}
 
 		echo '<div class="sr-overview-layout">';
@@ -371,28 +373,26 @@ class Script_Report {
 	 * @return string
 	 */
 	private function get_registration_source_from_backtrace() {
-		$trace      = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, self::BACKTRACE_FRAME_LIMIT ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace
-		$wp_content = wp_normalize_path( WP_CONTENT_DIR );
-		$wp_includes = wp_normalize_path( ABSPATH . WPINC );
+		$trace       = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, self::BACKTRACE_FRAME_LIMIT ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace
+		$plugins_dir = wp_normalize_path( plugin_dir_path( SCRIPT_REPORT_FILE ) . '../' );
+		$themes_dir  = wp_normalize_path( get_theme_root() . '/' );
 
 		foreach ( $trace as $frame ) {
 			if ( empty( $frame['file'] ) ) {
 				continue;
 			}
 			$file = wp_normalize_path( $frame['file'] );
-			if ( strpos( $file, $wp_includes ) === 0 ) {
-				continue;
+			if ( strpos( $file, $plugins_dir ) === 0 ) {
+				$rel = substr( $file, strlen( $plugins_dir ) );
+				if ( preg_match( '#^([^/]+)/#', $rel, $m ) ) {
+					return 'plugin: ' . $m[1];
+				}
 			}
-			if ( strpos( $file, $wp_content ) !== 0 ) {
-				return 'unknown';
-			}
-			$rel = substr( $file, strlen( $wp_content ) );
-			$rel = ltrim( $rel, '/' );
-			if ( preg_match( '#^plugins/([^/]+)/#', $rel, $m ) ) {
-				return 'plugin: ' . $m[1];
-			}
-			if ( preg_match( '#^themes/([^/]+)/#', $rel, $m ) ) {
-				return 'theme: ' . $m[1];
+			if ( strpos( $file, $themes_dir ) === 0 ) {
+				$rel = substr( $file, strlen( $themes_dir ) );
+				if ( preg_match( '#^([^/]+)/#', $rel, $m ) ) {
+					return 'theme: ' . $m[1];
+				}
 			}
 		}
 		return 'WordPress core';
@@ -480,7 +480,9 @@ class Script_Report {
 		$list_url = add_query_arg( 'view', 'list', $base_url );
 		$tree_url = add_query_arg( 'view', 'tree', $base_url );
 
-		global $wp_scripts, $wp_styles, $wp_script_modules; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- WP core globals.
+		$wp_scripts        = wp_scripts();
+		$wp_styles         = wp_styles();
+		$script_report_modules = function_exists( 'wp_script_modules' ) ? wp_script_modules() : null;
 
 		$base_plugin_url = plugin_dir_url( SCRIPT_REPORT_FILE );
 
@@ -557,10 +559,10 @@ class Script_Report {
 				</div>
 			<?php endif; ?>
 
-			<?php if ( $wp_script_modules && method_exists( $wp_script_modules, 'get_enqueued' ) ) : ?>
+			<?php if ( $script_report_modules && method_exists( $script_report_modules, 'get_enqueued' ) ) : ?>
 				<div class="section">
 					<h2><?php esc_html_e( 'Modules', 'script-report' ); ?></h2>
-					<?php $this->render_script_modules( $wp_script_modules ); ?>
+					<?php $this->render_script_modules( $script_report_modules ); ?>
 				</div>
 			<?php endif; ?>
 
@@ -967,22 +969,22 @@ class Script_Report {
 		echo '<span class="badge badge-inline">' . esc_html__( 'INLINE', 'script-report' ) . ' ' . esc_html( $this->format_bytes( $len ) ) . '</span>';
 	}
 
-	private function render_script_modules( $wp_script_modules ) {
+	private function render_script_modules( $script_report_modules ) {
 		$registered = array();
 		$enqueued   = array();
 
 		try {
-			if ( method_exists( $wp_script_modules, 'get_enqueued' ) ) {
-				$enqueued = $wp_script_modules->get_enqueued();
+			if ( method_exists( $script_report_modules, 'get_enqueued' ) ) {
+				$enqueued = $script_report_modules->get_enqueued();
 			}
-			if ( method_exists( $wp_script_modules, 'get_registered' ) ) {
-				$registered = $wp_script_modules->get_registered();
+			if ( method_exists( $script_report_modules, 'get_registered' ) ) {
+				$registered = $script_report_modules->get_registered();
 			} else {
-				$reflection = new ReflectionClass( $wp_script_modules );
+				$reflection = new ReflectionClass( $script_report_modules );
 				if ( $reflection->hasProperty( 'registered' ) ) {
 					$prop = $reflection->getProperty( 'registered' );
 					$prop->setAccessible( true );
-					$registered = $prop->getValue( $wp_script_modules );
+					$registered = $prop->getValue( $script_report_modules );
 				}
 			}
 		} catch ( Exception $e ) {
@@ -1057,27 +1059,7 @@ class Script_Report {
 			return $this->file_size_cache[ $normalized_src ];
 		}
 
-		$file_path = null;
-
-		if ( strpos( $src, 'http' ) !== 0 ) {
-			$file_path = wp_normalize_path( ABSPATH . ltrim( $src, '/' ) );
-		} else {
-			$wp_content_url  = content_url();
-			$wp_includes_url = includes_url();
-
-			if ( strpos( $src, $wp_content_url ) === 0 ) {
-				$rel = ltrim( str_replace( $wp_content_url, '', $src ), '/' );
-				$file_path = wp_normalize_path( WP_CONTENT_DIR . '/' . $rel );
-			} elseif ( strpos( $src, $wp_includes_url ) === 0 ) {
-				$rel = ltrim( str_replace( $wp_includes_url, '', $src ), '/' );
-				$file_path = wp_normalize_path( ABSPATH . WPINC . '/' . $rel );
-			} else {
-				$parsed = wp_parse_url( $src );
-				if ( ! empty( $parsed['path'] ) ) {
-					$file_path = wp_normalize_path( ABSPATH . ltrim( $parsed['path'], '/' ) );
-				}
-			}
-		}
+		$file_path = $this->resolve_src_to_path( $src );
 
 		if ( $file_path ) {
 			$file_path = $this->normalize_src( $file_path );
@@ -1090,6 +1072,53 @@ class Script_Report {
 		}
 
 		$this->file_size_cache[ $normalized_src ] = null;
+		return null;
+	}
+
+	/**
+	 * Resolve a script/style src URL to a local file path.
+	 *
+	 * Uses content_url(), includes_url(), and site_url() to map URLs back to
+	 * file system paths via their corresponding directory functions, avoiding
+	 * direct use of ABSPATH or WPINC constants.
+	 *
+	 * @param string $src Source URL or relative path.
+	 *
+	 * @return string|null Local file path or null if not resolvable.
+	 */
+	private function resolve_src_to_path( $src ) {
+		$script_report_content_url  = content_url();
+		$script_report_includes_url = includes_url();
+		$script_report_site_url     = site_url( '/' );
+
+		$script_report_content_dir  = wp_normalize_path( dirname( plugin_dir_path( SCRIPT_REPORT_FILE ), 2 ) );
+		$script_report_includes_dir = wp_normalize_path( $script_report_content_dir . '/../' . basename( $script_report_includes_url ) );
+		$script_report_root_dir     = wp_normalize_path( $script_report_content_dir . '/../' );
+
+		if ( strpos( $src, 'http' ) !== 0 ) {
+			return wp_normalize_path( $script_report_root_dir . ltrim( $src, '/' ) );
+		}
+
+		if ( strpos( $src, $script_report_content_url ) === 0 ) {
+			$rel = ltrim( str_replace( $script_report_content_url, '', $src ), '/' );
+			return wp_normalize_path( $script_report_content_dir . '/' . $rel );
+		}
+
+		if ( strpos( $src, $script_report_includes_url ) === 0 ) {
+			$rel = ltrim( str_replace( $script_report_includes_url, '', $src ), '/' );
+			return wp_normalize_path( $script_report_includes_dir . '/' . $rel );
+		}
+
+		if ( strpos( $src, $script_report_site_url ) === 0 ) {
+			$rel = ltrim( str_replace( $script_report_site_url, '', $src ), '/' );
+			return wp_normalize_path( $script_report_root_dir . $rel );
+		}
+
+		$parsed = wp_parse_url( $src );
+		if ( ! empty( $parsed['path'] ) ) {
+			return wp_normalize_path( $script_report_root_dir . ltrim( $parsed['path'], '/' ) );
+		}
+
 		return null;
 	}
 
