@@ -109,10 +109,10 @@ No. Script Report only runs when you open it (admin bar or URL). Normal visitors
 
 == Screenshots ==
 
-1. List view showing scripts and styles with load order and metadata.
-2. Tree view displaying dependency chains.
-3. Example of circular dependency detection.
-4. Filtering scripts by handle.
+1. Open the "Script Report" panel using admin navbar
+2. List view showing scripts and styles with load order and metadata.
+3. Tree view displaying dependency chains.
+4. Script Report item in the top admin bar for quick access.
 
 == Changelog ==
 
