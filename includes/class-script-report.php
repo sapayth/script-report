@@ -211,8 +211,14 @@ class Script_Report {
 
 		$title          = __( 'Script Report', 'script-report' );
 		$script_report  = $this;
-		$script_sources = $this->script_sources;
-		$style_sources  = $this->style_sources;
+
+		// Build sources from src URLs at render time (more reliable than hook-based backtrace).
+		$script_sources = $this->build_sources_from_registered( $wp_scripts );
+		$style_sources  = $this->build_sources_from_registered( $wp_styles );
+
+		// Merge any hook-collected sources (backtrace-based) for scripts without a src URL.
+		$script_sources = array_merge( $script_sources, $this->script_sources );
+		$style_sources  = array_merge( $style_sources, $this->style_sources );
 
 		require SCRIPT_REPORT_PATH . 'templates/panel.php';
 	}
@@ -399,6 +405,57 @@ class Script_Report {
 	}
 
 	/**
+	 * Determine source label (plugin/theme/core) from a script or style src URL.
+	 *
+	 * @since SCRIPT_REPORT_SINCE
+	 *
+	 * @param string $src Source URL of the script or style.
+	 *
+	 * @return string Source label, e.g. 'plugin: my-plugin', 'theme: flavor', 'WordPress core'.
+	 */
+	private function get_source_from_src( $src ) {
+		if ( empty( $src ) ) {
+			return 'WordPress core';
+		}
+
+		$content_url = content_url( '/' );
+		$plugins_url = plugins_url( '/' );
+		$themes_url  = content_url( '/themes/' );
+
+		if ( strpos( $src, $plugins_url ) === 0 ) {
+			$rel = substr( $src, strlen( $plugins_url ) );
+			if ( preg_match( '#^([^/]+)/#', $rel, $m ) ) {
+				return 'plugin: ' . $m[1];
+			}
+		}
+		if ( strpos( $src, $themes_url ) === 0 ) {
+			$rel = substr( $src, strlen( $themes_url ) );
+			if ( preg_match( '#^([^/]+)/#', $rel, $m ) ) {
+				return 'theme: ' . $m[1];
+			}
+		}
+
+		return 'WordPress core';
+	}
+
+	/**
+	 * Build sources map (handle => source label) for all registered items in a WP_Dependencies object.
+	 *
+	 * @since SCRIPT_REPORT_SINCE
+	 *
+	 * @param WP_Scripts|WP_Styles $wp_deps Dependency object.
+	 *
+	 * @return array Handle => source label.
+	 */
+	private function build_sources_from_registered( $wp_deps ) {
+		$sources = array();
+		foreach ( $wp_deps->registered as $handle => $item ) {
+			$sources[ $handle ] = $this->get_source_from_src( $item->src );
+		}
+		return $sources;
+	}
+
+	/**
 	 * Normalize a script/style src URL by stripping query string.
 	 *
 	 * @param string $src Source URL.
@@ -484,6 +541,10 @@ class Script_Report {
 		$wp_styles         = wp_styles();
 		$script_report_modules = function_exists( 'wp_script_modules' ) ? wp_script_modules() : null;
 
+		// Build sources from src URLs at render time (more reliable than hook-based backtrace).
+		$this->script_sources = array_merge( $this->build_sources_from_registered( $wp_scripts ), $this->script_sources );
+		$this->style_sources  = array_merge( $this->build_sources_from_registered( $wp_styles ), $this->style_sources );
+
 		$base_plugin_url = plugin_dir_url( SCRIPT_REPORT_FILE );
 
 		$report_css_url = $base_plugin_url . 'assets/report.css';
@@ -496,18 +557,74 @@ class Script_Report {
 		wp_add_inline_script(
 			'script-report-report',
 			'(function(){
-				var inputs = document.querySelectorAll(\'.report-toolbar input.filter\');
-				inputs.forEach(function(input) {
-					var section = input.closest(\'.section\');
+				function srFormatBytes(bytes) {
+					if (bytes < 1024) return bytes + \' B\';
+					if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + \' KB\';
+					return (bytes / (1024 * 1024)).toFixed(1) + \' MB\';
+				}
+
+				var sections = document.querySelectorAll(\'.section\');
+				sections.forEach(function(section) {
+					var input = section.querySelector(\'.report-toolbar input.filter\');
+					var select = section.querySelector(\'.report-toolbar .sr-source-filter\');
 					var list = section.querySelector(\'.list-view\');
 					var tree = section.querySelector(\'.tree-view\');
 					var items = list ? list.querySelectorAll(\'.list-item\') : [];
 					var nodes = tree ? tree.querySelectorAll(\'.node\') : [];
-					input.addEventListener(\'input\', function() {
-						var q = (this.value || \'\').toLowerCase();
-						items.forEach(function(el) { el.classList.toggle(\'hidden\', q && el.textContent.toLowerCase().indexOf(q) === -1); });
-						nodes.forEach(function(el) { el.classList.toggle(\'hidden\', q && el.textContent.toLowerCase().indexOf(q) === -1); });
-					});
+					var statsEl = section.querySelector(\'.stats\');
+
+					if (!input && !select) return;
+
+					var originalStatsHTML = statsEl ? statsEl.innerHTML : \'\';
+					var loadedLabel = \'\';
+					var sizeLabel = \'\';
+					if (statsEl) {
+						var si = statsEl.querySelectorAll(\'.stats-item\');
+						if (si.length >= 3) { var s = si[2].querySelector(\'strong\'); if (s) loadedLabel = s.outerHTML; }
+						if (si.length >= 4) { var s2 = si[3].querySelector(\'strong\'); if (s2) sizeLabel = s2.outerHTML; }
+					}
+
+					function applyFilters() {
+						var q = input ? (input.value || \'\').toLowerCase() : \'\';
+						var source = select ? select.value : \'\';
+						var visibleCount = 0;
+						var visibleEnqueued = 0;
+						var visibleSize = 0;
+
+						items.forEach(function(el) {
+							var matchesSearch = !q || el.textContent.toLowerCase().indexOf(q) !== -1;
+							var matchesSource = !source || el.getAttribute(\'data-sr-source\') === source;
+							var hidden = !matchesSearch || !matchesSource;
+							el.classList.toggle(\'hidden\', hidden);
+							if (!hidden) {
+								visibleCount++;
+								visibleSize += parseInt(el.getAttribute(\'data-sr-size\') || \'0\', 10);
+								if (el.getAttribute(\'data-sr-enqueued\') === \'1\') visibleEnqueued++;
+							}
+						});
+						nodes.forEach(function(el) {
+							var matchesSearch = !q || el.textContent.toLowerCase().indexOf(q) !== -1;
+							var matchesSource = !source || el.getAttribute(\'data-sr-source\') === source;
+							el.classList.toggle(\'hidden\', !matchesSearch || !matchesSource);
+						});
+
+						if (statsEl) {
+							if (!source && !q) {
+								statsEl.innerHTML = originalStatsHTML;
+							} else {
+								var ci = statsEl.querySelectorAll(\'.stats-item\');
+								if (ci.length >= 3 && loadedLabel) {
+									ci[2].innerHTML = loadedLabel + \' \' + visibleCount + \' <span class="meta">filtered</span>\';
+								}
+								if (ci.length >= 4 && sizeLabel) {
+									ci[3].innerHTML = sizeLabel + \' \' + srFormatBytes(visibleSize);
+								}
+							}
+						}
+					}
+
+					if (input) input.addEventListener(\'input\', applyFilters);
+					if (select) select.addEventListener(\'change\', applyFilters);
 				});
 			})();'
 		);
@@ -531,7 +648,7 @@ class Script_Report {
 				<?php $scripts_data = $this->get_deps_report_data( $wp_scripts ); ?>
 				<div class="section">
 					<h2><?php esc_html_e( 'JavaScript', 'script-report' ); ?></h2>
-					<?php $this->render_section_toolbar( $view, $list_url, $tree_url ); ?>
+					<?php $this->render_section_toolbar( $view, $list_url, $tree_url, $this->script_sources ); ?>
 					<?php
 					$this->render_deps_stats( $wp_scripts, count( $scripts_data['needed'] ), $scripts_data['total_size'], __( 'Scripts', 'script-report' ) );
 					if ( $view === 'tree' ) {
@@ -547,7 +664,7 @@ class Script_Report {
 				<?php $styles_data = $this->get_deps_report_data( $wp_styles ); ?>
 				<div class="section">
 					<h2><?php esc_html_e( 'CSS', 'script-report' ); ?></h2>
-					<?php $this->render_section_toolbar( $view, $list_url, $tree_url ); ?>
+					<?php $this->render_section_toolbar( $view, $list_url, $tree_url, $this->style_sources ); ?>
 					<?php
 					$this->render_deps_stats( $wp_styles, count( $styles_data['needed'] ), $styles_data['total_size'], __( 'Styles', 'script-report' ) );
 					if ( $view === 'tree' ) {
@@ -579,13 +696,34 @@ class Script_Report {
 	 * @param string $current_view 'list' or 'tree'.
 	 * @param string $list_url URL for list view.
 	 * @param string $tree_url URL for tree view.
+	 * @param array  $sources Handle => source label map for the source filter dropdown.
 	 */
-	private function render_section_toolbar( $current_view, $list_url, $tree_url ) {
+	private function render_section_toolbar( $current_view, $list_url, $tree_url, $sources = array() ) {
 		echo '<div class="report-toolbar">';
 		echo '<a href="' . esc_url( $list_url ) . '" class="' . ( $current_view === 'list' ? 'active' : '' ) . '">' . esc_html__( 'List', 'script-report' ) . '</a>';
 		echo '<a href="' . esc_url( $tree_url ) . '" class="' . ( $current_view === 'tree' ? 'active' : '' ) . '">' . esc_html__( 'Tree', 'script-report' ) . '</a>';
+		$this->render_source_filter( $sources );
 		echo '<input type="text" class="filter" placeholder="' . esc_attr__( 'Search…', 'script-report' ) . '" aria-label="' . esc_attr__( 'Search', 'script-report' ) . '">';
 		echo '</div>';
+	}
+
+	/**
+	 * Render a source filter dropdown from a handle => source label map.
+	 *
+	 * @since SCRIPT_REPORT_SINCE
+	 *
+	 * @param array $sources Handle => registration source label.
+	 */
+	public function render_source_filter( $sources ) {
+		$unique_sources = array_unique( array_values( $sources ) );
+		sort( $unique_sources );
+
+		echo '<select class="sr-source-filter" aria-label="' . esc_attr__( 'Filter by source', 'script-report' ) . '">';
+		echo '<option value="">' . esc_html__( 'All sources', 'script-report' ) . '</option>';
+		foreach ( $unique_sources as $source ) {
+			echo '<option value="' . esc_attr( $source ) . '">' . esc_html( $source ) . '</option>';
+		}
+		echo '</select>';
 	}
 
 	/**
@@ -812,8 +950,9 @@ class Script_Report {
 		$visited[] = $handle;
 
 		$label_registered = __( 'Added by', 'script-report' );
+		$source           = isset( $sources[ $handle ] ) ? $sources[ $handle ] : '';
 
-		echo '<div class="node ' . esc_attr( $indent_class ) . '">';
+		echo '<div class="node ' . esc_attr( $indent_class ) . '" data-sr-source="' . esc_attr( $source ) . '">';
 		echo '<span class="handle">' . esc_html( $handle ) . '</span>';
 		if ( in_array( $handle, $wp_deps->queue, true ) ) {
 			echo '<span class="badge badge-enqueued">' . esc_html__( 'ENQUEUED', 'script-report' ) . '</span>';
@@ -893,14 +1032,15 @@ class Script_Report {
 			$item        = $wp_deps->registered[ $handle ];
 			$is_enqueued = in_array( $handle, $wp_deps->queue, true );
 			$order_pos   = isset( $order_map[ $handle ] ) ? $order_map[ $handle ] + 1 : null;
+			$file_size   = $this->get_file_size( $item->src );
+			$source      = isset( $sources[ $handle ] ) ? $sources[ $handle ] : '';
 
-			echo '<div class="list-item">';
+			echo '<div class="list-item" data-sr-source="' . esc_attr( $source ) . '" data-sr-size="' . esc_attr( $file_size !== null ? $file_size : 0 ) . '" data-sr-enqueued="' . esc_attr( $is_enqueued ? '1' : '0' ) . '">';
 			echo '<div class="list-item-main">';
 			echo '<span class="handle">' . esc_html( $handle ) . '</span>';
 			if ( $order_pos !== null ) {
 				echo '<span class="order-badge">#' . (int) $order_pos . '</span>';
 			}
-			$file_size = $this->get_file_size( $item->src );
 			if ( $file_size !== null ) {
 				echo '<span class="size-badge">' . esc_html( $this->format_bytes( $file_size ) ) . '</span>';
 			}

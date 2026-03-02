@@ -15,6 +15,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 ?>
 <div id="sr-styles" class="sr-panel" role="tabpanel">
 	<?php if ( $wp_styles && $script_report_styles_data ) : ?>
+		<div class="report-toolbar">
+			<?php $script_report->render_source_filter( $style_sources ); ?>
+			<input type="text" class="filter" placeholder="<?php echo esc_attr__( 'Search…', 'script-report' ); ?>" aria-label="<?php echo esc_attr__( 'Search', 'script-report' ); ?>">
+		</div>
 		<?php $script_report->render_deps_stats( $wp_styles, count( $script_report_styles_data['needed'] ), $script_report_styles_data['total_size'], __( 'Styles', 'script-report' ) ); ?>
 		<?php $script_report->render_deps_list( $wp_styles, $script_report_styles_data['print_order'], $style_sources, false, $script_report_styles_data ); ?>
 	<?php else : ?>
