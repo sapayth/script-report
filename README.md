@@ -18,13 +18,8 @@ A WordPress plugin that audits and visualizes JS/CSS script and style dependenci
 
 ## Usage
 
-1. **Enable the report**  
-   Add `?script_report=true` to the URL, or `&script_report=true` if the URL already has query parameters.
-
-   Examples:
-   - `https://yoursite.com/wp-admin/` → `https://yoursite.com/wp-admin/?script_report=true`
-   - `https://yoursite.com/wp-admin/admin.php?page=wpuf-profile-forms` → `https://yoursite.com/wp-admin/admin.php?page=wpuf-profile-forms&script_report=true`
-   - `https://yoursite.com/some-page/` → `https://yoursite.com/some-page/?script_report=true`
+1. **Open the report**  
+   Use the **Script Report** link in the admin navbar (top bar) on any admin or frontend page. You can also add `?script_report=true` (or `&script_report=true` when the URL already has query parameters) to open the report directly.
 
 2. **Who can see it**  
    - Users with **Administrator** capability (`manage_options`) can always open the report.
@@ -52,8 +47,7 @@ A WordPress plugin that audits and visualizes JS/CSS script and style dependenci
 
 ## Security
 
-- Report is shown only if the user can `manage_options`, **or** `SCRIPT_REPORT_DEBUG` is defined and true, **or** the URL includes a valid `_wpnonce` for the `script_report_view` action (e.g. the “Script Report” admin bar link).
-- Nonce validation is used for nonced links; direct `?script_report=true` still requires capability or `SCRIPT_REPORT_DEBUG`.
+- Report is shown only if the user can `manage_options`, **or** `SCRIPT_REPORT_DEBUG` is defined and true. The admin bar button uses a nonce for the `script_report_view` action; direct `?script_report=true` still requires capability or `SCRIPT_REPORT_DEBUG`.
 
 ## License
 
