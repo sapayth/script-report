@@ -45,8 +45,11 @@ class Script_Report {
 		add_action( 'admin_bar_menu', array( $this, 'add_admin_bar_link' ), 100 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_panel_assets' ), 20 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'maybe_enqueue_panel_assets' ), 20 );
+		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_highlight_assets' ), 20 );
+		add_action( 'admin_enqueue_scripts', array( $this, 'maybe_enqueue_highlight_assets' ), 20 );
 		add_action( 'wp_footer', array( $this, 'maybe_output_panel' ), 10 );
 		add_action( 'admin_footer', array( $this, 'maybe_output_panel' ), 10 );
+		add_action( 'wp_ajax_script_report_dismiss_highlight', array( $this, 'ajax_dismiss_highlight' ) );
 	}
 
 	/**
@@ -92,6 +95,52 @@ class Script_Report {
 	}
 
 	/**
+	 * Whether to show the highlight pulse on the admin bar item for this user.
+	 * Sets the flag for admins who haven't seen it yet (handles users who weren't
+	 * the one activating the plugin).
+	 *
+	 * @since SCRIPT_REPORT_SINCE
+	 *
+	 * @return bool
+	 */
+	private function should_highlight_admin_bar() {
+		$user_id = get_current_user_id();
+
+		if ( ! $user_id || ! $this->user_can_view_panel() ) {
+			return false;
+		}
+
+		$value = get_user_meta( $user_id, 'script_report_highlight', true );
+
+		// First page load for this admin — set the flag so they see the pulse.
+		if ( '' === $value ) {
+			update_user_meta( $user_id, 'script_report_highlight', '1' );
+
+			return true;
+		}
+
+		return '1' === $value;
+	}
+
+	/**
+	 * AJAX handler to dismiss the admin bar highlight for the current user.
+	 *
+	 * @since SCRIPT_REPORT_SINCE
+	 *
+	 * @return void
+	 */
+	public function ajax_dismiss_highlight() {
+		check_ajax_referer( 'script_report_highlight', '_nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Unauthorized', 403 );
+		}
+
+		update_user_meta( get_current_user_id(), 'script_report_highlight', '0' );
+		wp_send_json_success();
+	}
+
+	/**
 	 * Whether to collect registration sources (for both full report and panel).
 	 *
 	 * @return bool
@@ -119,12 +168,17 @@ class Script_Report {
 		if ( ! $this->user_can_view_panel() ) {
 			return;
 		}
-			$wp_admin_bar->add_node(
+			$classes = 'script-report-link';
+		if ( $this->should_highlight_admin_bar() ) {
+			$classes .= ' sr-highlight';
+		}
+
+		$wp_admin_bar->add_node(
 			array(
 				'id'     => 'script-report',
 				'title'  => __( 'Script Report', 'script-report' ),
 				'href'   => '#sr-overview',
-				'meta'   => array( 'class' => 'script-report-link' ),
+				'meta'   => array( 'class' => $classes ),
 			)
 		);
 		$wp_admin_bar->add_node(
@@ -189,6 +243,159 @@ class Script_Report {
 			array(),
 			SCRIPT_REPORT_VERSION
 		);
+
+	}
+
+	/**
+	 * Enqueue inline CSS and JS for the admin bar highlight pulse.
+	 * Runs independently of the panel so the highlight shows even when the panel hasn't been opened.
+	 *
+	 * @since SCRIPT_REPORT_SINCE
+	 *
+	 * @return void
+	 */
+	public function maybe_enqueue_highlight_assets() {
+		if ( ! $this->should_highlight_admin_bar() ) {
+			return;
+		}
+
+		$ajax_url = esc_url( admin_url( 'admin-ajax.php' ) );
+		$nonce    = wp_create_nonce( 'script_report_highlight' );
+
+		$highlight_css = '
+			.sr-onboarding-overlay {
+				position: fixed;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				background: rgba(0, 0, 0, 0.6);
+				z-index: 9999;
+				backdrop-filter: blur(2px);
+				-webkit-backdrop-filter: blur(2px);
+			}
+			#wpadminbar #wp-admin-bar-script-report {
+				position: relative;
+			}
+			#wpadminbar #wp-admin-bar-script-report > .ab-item {
+				position: relative;
+			}
+			.sr-onboarding-tooltip {
+				position: fixed;
+				z-index: 100001;
+				width: 320px;
+				background: #fff;
+				border-radius: 8px;
+				box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+				padding: 20px;
+				font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+				font-size: 14px;
+				line-height: 1.5;
+				color: #1a1f1a;
+			}
+			.sr-onboarding-tooltip::before {
+				content: "";
+				position: absolute;
+				top: -8px;
+				left: 24px;
+				width: 16px;
+				height: 16px;
+				background: #fff;
+				transform: rotate(45deg);
+				border-radius: 2px;
+			}
+			.sr-onboarding-tooltip h4 {
+				margin: 0 0 8px 0;
+				font-size: 15px;
+				font-weight: 600;
+				color: #0d120c;
+			}
+			.sr-onboarding-tooltip p {
+				margin: 0 0 16px 0;
+				color: #4a5c46;
+				font-size: 13px;
+			}
+			.sr-onboarding-actions {
+				display: flex;
+				gap: 8px;
+				justify-content: flex-end;
+			}
+			.sr-onboarding-btn {
+				padding: 7px 16px;
+				border-radius: 4px;
+				border: none;
+				font-size: 13px;
+				font-weight: 500;
+				cursor: pointer;
+				transition: background 0.15s;
+			}
+			.sr-onboarding-btn-primary {
+				background: #2d5c28;
+				color: #fff;
+			}
+			.sr-onboarding-btn-primary:hover {
+				background: #234a1e;
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.sr-onboarding-overlay { backdrop-filter: none; -webkit-backdrop-filter: none; }
+			}
+		';
+		wp_add_inline_style( 'admin-bar', $highlight_css );
+
+		$tooltip_title   = esc_js( __( 'Script Report', 'script-report' ) );
+		$tooltip_message = esc_js( __( 'Click here anytime to inspect all JavaScript and CSS loaded on the current page.', 'script-report' ) );
+		$btn_ok_label    = esc_js( __( 'Got it', 'script-report' ) );
+
+		$highlight_js = '
+			(function() {
+				var target = document.querySelector("#wp-admin-bar-script-report > .ab-item");
+				if (!target) return;
+
+				function dismiss() {
+					var overlay = document.querySelector(".sr-onboarding-overlay");
+					var tooltip = document.querySelector(".sr-onboarding-tooltip");
+					if (overlay) overlay.remove();
+					if (tooltip) tooltip.remove();
+
+					var xhr = new XMLHttpRequest();
+					xhr.open("POST", "' . $ajax_url . '", true);
+					xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+					xhr.send("action=script_report_dismiss_highlight&_nonce=' . $nonce . '");
+				}
+
+				// Build overlay
+				var overlay = document.createElement("div");
+				overlay.className = "sr-onboarding-overlay";
+				overlay.addEventListener("click", dismiss);
+				document.body.appendChild(overlay);
+
+				// Build tooltip positioned below the admin bar item
+				var rect = target.getBoundingClientRect();
+				var tooltip = document.createElement("div");
+				tooltip.className = "sr-onboarding-tooltip";
+				tooltip.style.top = (rect.bottom + 12) + "px";
+				tooltip.style.left = Math.max(8, rect.left + 15) + "px";
+				tooltip.innerHTML = "<h4>' . $tooltip_title . '</h4>"
+					+ "<p>' . $tooltip_message . '</p>"
+					+ "<div class=\"sr-onboarding-actions\">"
+					+ "<button type=\"button\" class=\"sr-onboarding-btn sr-onboarding-btn-primary\">' . $btn_ok_label . '</button>"
+					+ "</div>";
+				document.body.appendChild(tooltip);
+
+				// Ensure tooltip does not overflow viewport
+				var tooltipRect = tooltip.getBoundingClientRect();
+				if (tooltipRect.right > window.innerWidth - 8) {
+					tooltip.style.left = (window.innerWidth - tooltipRect.width - 8) + "px";
+				}
+
+				// Button handler
+				tooltip.querySelector(".sr-onboarding-btn-primary").addEventListener("click", dismiss);
+
+				// Also dismiss if the actual admin bar item is clicked
+				target.addEventListener("click", dismiss, { once: true });
+			})();
+		';
+		wp_add_inline_script( 'admin-bar', $highlight_js );
 	}
 
 	/**

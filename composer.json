@@ -1,0 +1,41 @@
+{
+    "name": "sapayth/script-report",
+    "description": "Audit and visualize JS/CSS script dependencies in WordPress.",
+    "type": "wordpress-plugin",
+    "require": {
+        "php": ">=7.4",
+        "bitapps/wp-telemetry": "^0.0.9"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "autoload": {
+        "psr-4": {
+            "ScriptReport\\": "includes/"
+        }
+    },
+    "require-dev": {
+        "coenjacobs/mozart": "^1.2"
+    },
+    "extra": {
+        "mozart": {
+            "dep_namespace": "ScriptReport\\Vendor\\",
+            "dep_directory": "/lib/",
+            "classmap_directory": "/lib/classes/",
+            "classmap_prefix": "ScriptReport_",
+            "packages": [
+                "bitapps/wp-telemetry"
+            ]
+        }
+    },
+    "scripts": {
+        "post-install-cmd": [
+            "\"vendor/bin/mozart\" compose"
+        ],
+        "post-update-cmd": [
+            "\"vendor/bin/mozart\" compose"
+        ]
+    }
+}

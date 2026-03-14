@@ -4,7 +4,7 @@ Donate link: https://sapayth.com/
 Tags: debug, debug bar, development, performance, scripts
 Requires at least: 5.0
 Tested up to: 6.9
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -17,7 +17,7 @@ Script Report is a minimal and focused debugging tool for WordPress developers. 
 
 When something loads out of order, loads twice, or slows down a page, Script Report helps you see exactly what is happening.
 
-Use the Script Report link in the admin navbar on any page to open a complete breakdown of scripts and styles, their load order, dependencies, and origin. You can also append `?script_report=true` or `&script_report=true` to the URL.
+Use the Script Report link in the admin navbar on any page to open a complete breakdown of scripts and styles, their load order, dependencies, and origin.
 
 === Why Use Script Report? ===
 
@@ -83,7 +83,7 @@ Quickly filter by handle or source to narrow down large lists. Filtering works c
 
 1. Upload the plugin files to `wp-content/plugins/script-report/`, or install through the WordPress Plugins screen.
 2. Activate the plugin through the Plugins screen.
-3. As an Administrator, click the Script Report link in the admin navbar on any page to view the report. You can also append `?script_report=true` or `&script_report=true` to the URL.
+3. As an Administrator, click the "Script Report" link in the admin navbar on any page to view the report.
 
 == Frequently Asked Questions ==
 
@@ -101,11 +101,11 @@ Do not enable this constant on production unless temporarily required.
 
 Yes. The report is only displayed to users who can `manage_options`, or when explicitly enabled using `SCRIPT_REPORT_DEBUG`.
 
-No data is stored and nothing runs unless you open the report (via the admin bar link or the URL parameter).
+No data is stored and nothing runs unless you open the report via the admin bar link.
 
 = Does this affect site performance? =
 
-No. Script Report only runs when you open it (admin bar or URL). Normal visitors and pages remain unaffected.
+No. Script Report only runs when you open it via the admin bar. Normal visitors and pages remain unaffected.
 
 == Screenshots ==
 
@@ -116,10 +116,8 @@ No. Script Report only runs when you open it (admin bar or URL). Normal visitors
 
 == Changelog ==
 
+= 1.1.0 =
+* New – Filter scripts and styles by plugin or theme — find exactly what they are loading
+
 = 1.0.0 =
 * Initial release.
-
-== Upgrade Notice ==
-
-= 1.0.0 =
-Initial release of Script Report.

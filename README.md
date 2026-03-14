@@ -19,7 +19,7 @@ A WordPress plugin that audits and visualizes JS/CSS script and style dependenci
 ## Usage
 
 1. **Open the report**  
-   Use the **Script Report** link in the admin navbar (top bar) on any admin or frontend page. You can also add `?script_report=true` (or `&script_report=true` when the URL already has query parameters) to open the report directly.
+   Use the **Script Report** link in the admin navbar (top bar) on any admin or frontend page.
 
 2. **Who can see it**  
    - Users with **Administrator** capability (`manage_options`) can always open the report.
@@ -42,12 +42,12 @@ A WordPress plugin that audits and visualizes JS/CSS script and style dependenci
   - “Enqueued by” (which top-level script pulled it in) and “Required by” (who depends on it)
 - **CSS** – Same structure for styles.
 - **Script modules (WP 6.5+)** – Registered and enqueued modules and their dependencies.
-- **List vs Tree** – Toggle with `?script_report=true&view=list` (default) or `&view=tree`. Tree shows dependency chains and flags circular or missing deps.
+- **List vs Tree** – Toggle between List (default) and Tree view. Tree shows dependency chains and flags circular or missing deps.
 - **Filter** – Type in the filter box to narrow by handle or `src` (client-side).
 
 ## Security
 
-- Report is shown only if the user can `manage_options`, **or** `SCRIPT_REPORT_DEBUG` is defined and true. The admin bar button uses a nonce for the `script_report_view` action; direct `?script_report=true` still requires capability or `SCRIPT_REPORT_DEBUG`.
+- Report is shown only if the user can `manage_options`, **or** `SCRIPT_REPORT_DEBUG` is defined and true. The admin bar menu uses a nonce for the `script_report_view` action.
 
 ## License
 

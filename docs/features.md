@@ -2,7 +2,7 @@
 
 ## Trigger
 
-- Add `?script_report=true` to any admin URL to replace the page with the dependency report.
+- Click the **Script Report** link in the admin bar to open the dependency report on any page.
 
 ## JavaScript
 
