@@ -99,7 +99,7 @@ class Script_Report {
 	 * Sets the flag for admins who haven't seen it yet (handles users who weren't
 	 * the one activating the plugin).
 	 *
-	 * @since SCRIPT_REPORT_SINCE
+	 * @since 1.2.0
 	 *
 	 * @return bool
 	 */
@@ -125,7 +125,7 @@ class Script_Report {
 	/**
 	 * AJAX handler to dismiss the admin bar highlight for the current user.
 	 *
-	 * @since SCRIPT_REPORT_SINCE
+	 * @since 1.2.0
 	 *
 	 * @return void
 	 */
@@ -250,7 +250,7 @@ class Script_Report {
 	 * Enqueue inline CSS and JS for the admin bar highlight pulse.
 	 * Runs independently of the panel so the highlight shows even when the panel hasn't been opened.
 	 *
-	 * @since SCRIPT_REPORT_SINCE
+	 * @since 1.2.0
 	 *
 	 * @return void
 	 */
@@ -614,7 +614,7 @@ class Script_Report {
 	/**
 	 * Determine source label (plugin/theme/core) from a script or style src URL.
 	 *
-	 * @since SCRIPT_REPORT_SINCE
+	 * @since 1.2.0
 	 *
 	 * @param string $src Source URL of the script or style.
 	 *
@@ -648,7 +648,7 @@ class Script_Report {
 	/**
 	 * Build sources map (handle => source label) for all registered items in a WP_Dependencies object.
 	 *
-	 * @since SCRIPT_REPORT_SINCE
+	 * @since 1.2.0
 	 *
 	 * @param WP_Scripts|WP_Styles $wp_deps Dependency object.
 	 *
@@ -917,7 +917,7 @@ class Script_Report {
 	/**
 	 * Render a source filter dropdown from a handle => source label map.
 	 *
-	 * @since SCRIPT_REPORT_SINCE
+	 * @since 1.2.0
 	 *
 	 * @param array $sources Handle => registration source label.
 	 */

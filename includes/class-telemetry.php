@@ -15,7 +15,7 @@ use ScriptReport\Vendor\BitApps\WPTelemetry\Telemetry\TelemetryConfig;
  * Configures the bitapps/wp-telemetry library to show a feedback modal when
  * the plugin is deactivated and sends the response to the Feedio API.
  *
- * @since SCRIPT_REPORT_SINCE
+ * @since 1.2.0
  */
 class Script_Report_Telemetry {
 
@@ -25,7 +25,7 @@ class Script_Report_Telemetry {
 	 * Configures the wp-telemetry library with plugin-specific settings and
 	 * initializes the deactivation feedback survey.
 	 *
-	 * @since SCRIPT_REPORT_SINCE
+	 * @since 1.2.0
 	 *
 	 * @return void
 	 */
@@ -53,7 +53,7 @@ class Script_Report_Telemetry {
 	/**
 	 * Check if 7 days have passed since plugin activation.
 	 *
-	 * @since SCRIPT_REPORT_SINCE
+	 * @since 1.2.0
 	 *
 	 * @return bool True if 7 days have elapsed since activation.
 	 */
@@ -72,7 +72,7 @@ class Script_Report_Telemetry {
 	 *
 	 * Script Report does not have a Pro version, so this option is not relevant.
 	 *
-	 * @since SCRIPT_REPORT_SINCE
+	 * @since 1.2.0
 	 *
 	 * @param array $reasons Deactivation reasons array.
 	 *

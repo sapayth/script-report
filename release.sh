@@ -53,6 +53,9 @@ echo "Deploying $PLUGIN_SLUG v$VERSION to WordPress.org..."
 echo ""
 echo "Step 1: Building release package..."
 
+echo "Installing production dependencies only..."
+composer install --no-dev --optimize-autoloader --quiet
+
 rm -rf "$RELEASE_DIR"
 mkdir -p "$RELEASE_DIR"
 
@@ -149,6 +152,9 @@ echo "Step 8: Cleaning up..."
 cd -
 rm -rf "$SVN_DIR"
 rm -rf "$RELEASE_DIR"
+
+echo "Restoring dev dependencies..."
+composer install --quiet
 
 echo ""
 echo "Done! $PLUGIN_SLUG v$VERSION has been deployed to WordPress.org."

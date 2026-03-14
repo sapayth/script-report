@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Script Report
  * Description: Audit and visualize JS/CSS script dependencies. Use the admin bar "Script Report" menu to see the dependency report.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Requires at least: 5.0
  * Requires PHP: 7.4
  * Author: Sapayth H.
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'SCRIPT_REPORT_FILE', __FILE__ );
 define( 'SCRIPT_REPORT_PATH', plugin_dir_path( SCRIPT_REPORT_FILE ) );
-define( 'SCRIPT_REPORT_VERSION', '1.1.0' );
+define( 'SCRIPT_REPORT_VERSION', '1.2.0' );
 
 if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
 	require_once __DIR__ . '/vendor/autoload.php';
