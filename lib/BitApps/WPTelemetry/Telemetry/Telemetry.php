@@ -29,7 +29,7 @@ class Telemetry
     }
     public static function view($fileName, $args)
     {
-        load_template(\dirname(__DIR__) . '/views/' . $fileName . '.php', false, $args);
+        load_template(SCRIPT_REPORT_LIB . '/BitApps/WPTelemetry/views/' . $fileName . '.php', false, $args);
     }
     public static function sendReport($route, $data, $blocking = false)
     {

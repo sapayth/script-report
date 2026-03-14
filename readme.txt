@@ -4,7 +4,7 @@ Donate link: https://sapayth.com/
 Tags: debug, debug bar, development, performance, scripts
 Requires at least: 5.0
 Tested up to: 6.9
-Stable tag: 1.2.0
+Stable tag: 1.2.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -115,6 +115,10 @@ No. Script Report only runs when you open it via the admin bar. Normal visitors 
 4. Script Report item in the top admin bar for quick access.
 
 == Changelog ==
+
+= 1.2.1 =
+* Fix – Resolve fatal error caused by incorrect telemetry template and asset paths
+* Improvement – Use plugin constants for reliable path resolution
 
 = 1.2.0 =
 * New – Deactivation feedback survey to help improve the plugin
