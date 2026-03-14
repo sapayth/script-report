@@ -54,7 +54,7 @@ echo ""
 echo "Step 1: Building release package..."
 
 echo "Installing production dependencies only..."
-composer install --no-dev --optimize-autoloader --quiet
+composer install --no-dev --no-scripts --optimize-autoloader --quiet
 
 rm -rf "$RELEASE_DIR"
 mkdir -p "$RELEASE_DIR"

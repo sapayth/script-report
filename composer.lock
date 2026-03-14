@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b61f7376ab1527275cadfa520632b67b",
+    "content-hash": "bfbf0c4425d91789e2f8449ccb74aaa8",
     "packages": [
         {
             "name": "bitapps/wp-telemetry",
