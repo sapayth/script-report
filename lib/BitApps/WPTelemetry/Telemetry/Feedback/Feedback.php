@@ -34,7 +34,7 @@ class Feedback
     }
     public static function getAssetPath()
     {
-        return plugin_dir_url(\dirname(\dirname(__DIR__)));
+        return plugin_dir_url(SCRIPT_REPORT_FILE) . 'lib/BitApps/WPTelemetry/';
     }
     /**
      * Print deactivate feedback dialog.
