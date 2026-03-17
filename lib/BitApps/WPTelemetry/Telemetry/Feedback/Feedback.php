@@ -74,7 +74,8 @@ class Feedback
         $report['url'] = esc_url(home_url());
         $report['site_lang'] = get_bloginfo('language');
         $report['feedback_key'] = sanitize_text_field(wp_unslash($_POST['reason_key'])) ?: null;
-        $report['feedback'] = sanitize_text_field(wp_unslash($_POST["reason_{$report['feedback_key']}"])) ?: null;
+        $feedback_field = "reason_{$report['feedback_key']}";
+        $report['feedback'] = isset($_POST[$feedback_field]) ? sanitize_text_field(wp_unslash($_POST[$feedback_field])) : null;
         $report['plugin_slug'] = TelemetryConfig::getPrefix();
         $report['plugin_version'] = TelemetryConfig::getversion();
         Telemetry::sendReport('deactivate-reason', $report);

@@ -23,6 +23,7 @@ define( 'SCRIPT_REPORT_ASSETS', plugins_url( 'assets', SCRIPT_REPORT_FILE ) );
 define( 'SCRIPT_REPORT_INCLUDES', SCRIPT_REPORT_PATH . 'includes' );
 define( 'SCRIPT_REPORT_LIB', SCRIPT_REPORT_PATH . 'lib' );
 define( 'SCRIPT_REPORT_VERSION', '1.2.1' );
+define( 'SCRIPT_REPORT_TELEMETRY_TOKEN', 'ef0a5661-7381-4b13-83b1-3e232cb40fb2' );
 
 if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
 	require_once __DIR__ . '/vendor/autoload.php';
@@ -48,6 +49,24 @@ register_activation_hook( SCRIPT_REPORT_FILE, function () {
 
 register_deactivation_hook( SCRIPT_REPORT_FILE, function () {
 	do_action( 'script_report_deactivate' );
+
+	if ( ! function_exists( 'wp_remote_post' ) ) {
+		return;
+	}
+
+	$token      = defined( 'SCRIPT_REPORT_TELEMETRY_TOKEN' ) ? SCRIPT_REPORT_TELEMETRY_TOKEN : '';
+	$server_url = apply_filters( 'script_report_telemetry_server_url', 'https://feedio.sapayth.com/api/t/' . $token . '/' );
+	$endpoint   = rtrim( $server_url, '/' ) . '/plugin-deactivate';
+
+	wp_remote_post( $endpoint, [
+		'timeout'   => 2,
+		'blocking'  => false,
+		'sslverify' => false,
+		'body'      => [
+			'url'         => home_url(),
+			'plugin_slug' => 'script-report',
+		],
+	] );
 } );
 
 add_action( 'init', [ 'Script_Report_Telemetry', 'init' ] );
